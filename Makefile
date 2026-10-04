@@ -1,5 +1,8 @@
 .PHONY: install install-ocr test test-fast lint gamemaster demo mock
 
+# full game data once `make gamemaster` has fetched it, else the bundled sample
+SPECIES := $(if $(wildcard data/latest.json),--species data/latest.json)
+
 install:            ## planner + scanner, Tesseract fallback OCR
 	pip install -e '.[dev]'
 
@@ -19,8 +22,8 @@ gamemaster:         ## download the latest datamined game master to data/latest.
 	./scripts/fetch_gamemaster.sh
 
 demo:               ## plan from the bundled example inventory
-	pogo-evo-planner plan examples/inventory_sample.json
+	pogo-evo-planner plan examples/inventory_sample.json $(SPECIES)
 
 mock:               ## render synthetic screens + recording into mock/ and scan them
 	python tests/mockscreens.py mock
-	pogo-evo-planner scan mock/bag.png mock/recording.mp4 -o mock/inventory.json --plan
+	pogo-evo-planner scan mock/bag.png mock/recording.mp4 -o mock/inventory.json --plan $(SPECIES)

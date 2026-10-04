@@ -106,6 +106,9 @@ that was really a Kleavor's CP, added three candy counts and the missing Maushol
 
 ## How it works
 
+Full walkthrough, with diagrams, of how missing species are found and how evolutions are
+ranked: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ### Scanning (`pogo_evo_planner/scan/`)
 
 | Step | Module | Notes |
