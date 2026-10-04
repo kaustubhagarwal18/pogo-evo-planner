@@ -6,6 +6,7 @@ JSON format (see examples/inventory_sample.json):
   "candy": {"DRATINI": 60, ...},          # keyed by family (base species)
   "items": {"ITEM_METAL_COAT": 1, ...},
   "pokedex": ["DRATINI", ...],            # species already registered
+  "not_caught": ["DRAGONITE", ...],       # never caught (silhouette on an EVOLVE button)
   "pokemon": [{"species": "DRATINI", "iv": [15, 13, 14]}, ...]
 }
 
@@ -32,6 +33,7 @@ class Specimen:
 
     @property
     def iv_pct(self) -> float | None:
+        """IV total as a percentage of the 45-point maximum, or None when IVs are unknown."""
         return None if self.iv is None else round(sum(self.iv) / 45 * 100, 1)
 
 
@@ -42,18 +44,22 @@ class Inventory:
     items: dict[str, int] = field(default_factory=dict)
     pokedex: set[str] = field(default_factory=set)
     pokemon: list[Specimen] = field(default_factory=list)
+    not_caught: set[str] = field(default_factory=set)   # overrides a storage reading of the same species
 
 
 def _norm(name: str) -> str:
+    """Normalize a species or family name to the game-master id style (DRATINI, MR_MIME)."""
     return name.strip().upper().replace(" ", "_").replace("-", "_")
 
 
 def _specimen(raw: dict, i: int) -> Specimen:
+    """Build a Specimen from one inventory JSON entry, defaulting the label to its position."""
     iv = raw.get("iv")
     return Specimen(_norm(raw["species"]), tuple(iv) if iv else None, raw.get("label", f"#{i + 1}"))
 
 
 def load_pokemon_csv(path: str | Path) -> list[Specimen]:
+    """Read owned Pokémon from a CSV, matching species and IV columns loosely by header."""
     with open(path, newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     if not rows:
@@ -76,14 +82,20 @@ def load_pokemon_csv(path: str | Path) -> list[Specimen]:
 
 
 def load_inventory(path: str | Path, pokemon_csv: str | Path | None = None) -> Inventory:
+    """Load an inventory JSON, optionally taking the Pokémon list from a CSV instead."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    pokemon = load_pokemon_csv(pokemon_csv) if pokemon_csv else [
-        _specimen(p, i) for i, p in enumerate(data.get("pokemon", []))
-    ]
+    return inventory_from_dict(data, load_pokemon_csv(pokemon_csv) if pokemon_csv else None)
+
+
+def inventory_from_dict(data: dict, pokemon: list[Specimen] | None = None) -> Inventory:
+    """Build an Inventory from the inventory JSON structure (as `scan` writes it)."""
+    if pokemon is None:
+        pokemon = [_specimen(p, i) for i, p in enumerate(data.get("pokemon", []))]
     return Inventory(
         rare_candy=int(data.get("rare_candy", 0)),
         candy={_norm(k): int(v) for k, v in data.get("candy", {}).items()},
         items={k: int(v) for k, v in data.get("items", {}).items()},
         pokedex={_norm(s) for s in data.get("pokedex", [])},
+        not_caught={_norm(s) for s in data.get("not_caught", [])},
         pokemon=pokemon,
     )

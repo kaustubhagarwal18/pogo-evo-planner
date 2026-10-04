@@ -38,20 +38,24 @@ class Word:
 
     @property
     def cx(self) -> float:
+        """Horizontal centre of the word box."""
         return self.x + self.w / 2
 
     @property
     def cy(self) -> float:
+        """Vertical centre of the word box."""
         return self.y + self.h / 2
 
 
 # ---------------- tesseract ----------------
 
 def tesseract_available() -> bool:
+    """True when the tesseract binary is on PATH."""
     return shutil.which("tesseract") is not None
 
 
 def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
+    """One Tesseract pass over an image, with boxes scaled back to original pixels."""
     with tempfile.NamedTemporaryFile(suffix=".png") as f:
         cv2.imwrite(f.name, img)
         out = subprocess.run(
@@ -99,6 +103,7 @@ def _tesseract_words(img: np.ndarray, psm: int = 11) -> list[Word]:
 
 @lru_cache(maxsize=1)
 def _rapidocr_engine():
+    """Create the RapidOCR engine once and reuse it; supports both package names."""
     try:
         from rapidocr import RapidOCR  # rapidocr >= 2
     except ImportError:
@@ -107,6 +112,7 @@ def _rapidocr_engine():
 
 
 def rapidocr_available() -> bool:
+    """True when RapidOCR imports and its models load."""
     try:
         _rapidocr_engine()
         return True
@@ -115,6 +121,7 @@ def rapidocr_available() -> bool:
 
 
 def _split_line(box, text: str, score: float) -> list[Word]:
+    """Split a RapidOCR text line into words, estimating each word's box from its character position."""
     pts = np.asarray(box, dtype=float).reshape(-1, 2)
     x0, y0 = pts.min(axis=0)
     x1, y1 = pts.max(axis=0)
@@ -130,6 +137,7 @@ def _split_line(box, text: str, score: float) -> list[Word]:
 
 
 def _rapidocr_words(img: np.ndarray) -> list[Word]:
+    """OCR an image with RapidOCR and return word-level boxes."""
     out = _rapidocr_engine()(img)
     if isinstance(out, tuple):  # rapidocr_onnxruntime: (result, elapse); result = [[box, text, score], ...]
         lines = [(b, t, s) for b, t, s in (out[0] or [])]
@@ -146,13 +154,14 @@ def _rapidocr_words(img: np.ndarray) -> list[Word]:
 # ---------------- entry point ----------------
 
 def available_backend(preferred: str = "auto") -> str:
+    """Pick the OCR backend to use, raising with install hints when none is available."""
     if preferred in ("rapidocr", "auto") and rapidocr_available():
         return "rapidocr"
     if preferred in ("tesseract", "auto") and tesseract_available():
         return "tesseract"
     if preferred == "rapidocr":
-        raise RuntimeError("RapidOCR not installed: pip install 'rarecandy[ocr]'")
-    raise RuntimeError("No OCR backend found: install RapidOCR (pip install 'rarecandy[ocr]') or Tesseract")
+        raise RuntimeError("RapidOCR not installed: pip install 'pogo-evo-planner[ocr]'")
+    raise RuntimeError("No OCR backend found: install RapidOCR (pip install 'pogo-evo-planner[ocr]') or Tesseract")
 
 
 def read_words(image: np.ndarray | str | Path, backend: str = "auto") -> list[Word]:

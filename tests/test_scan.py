@@ -4,16 +4,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import cv2
 import numpy as np
 
-from rarecandy.gamemaster import load_species
-from rarecandy.scan.frames import extract_frames
-from rarecandy.scan.ocr import Word, _split_line, available_backend
-from rarecandy.scan.pipeline import ScanReport, merge, scan
-from rarecandy.scan.screens import (
+from pogo_evo_planner.gamemaster import load_species
+from pogo_evo_planner.scan.frames import extract_frames
+from pogo_evo_planner.scan.ocr import Word, _split_line, available_backend
+from pogo_evo_planner.scan.pipeline import ScanReport, merge, scan
+from pogo_evo_planner.scan.screens import (
     ScreenResult,
     SpeciesMatcher,
     classify,
+    evolve_sprite_caught,
     parse_bag,
     parse_detail,
     parse_pokedex,
@@ -22,8 +24,27 @@ from rarecandy.scan.screens import (
 
 from . import mockscreens
 
-SPECIES = load_species(Path(__file__).resolve().parent.parent / "rarecandy/data/species_sample.json")
+SPECIES = load_species(Path(__file__).resolve().parent.parent / "pogo_evo_planner/data/species_sample.json")
 M = SpeciesMatcher(SPECIES)
+
+
+def evolve_button(sprite: str) -> tuple[np.ndarray, Word]:
+    """A green EVOLVE button like a 576 px wide phone shows, with a colour or silhouette sprite."""
+    img = np.full((1296, 576, 3), 245, np.uint8)
+    green = cv2.cvtColor(np.uint8([[[57, 88, 228]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()
+    cv2.rectangle(img, (40, 975), (400, 1060), green, -1)
+    if sprite == "silhouette":   # a darker shade of the button green
+        dark = cv2.cvtColor(np.uint8([[[57, 110, 140]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()
+        cv2.circle(img, (100, 1016), 26, dark, -1)
+    elif sprite == "dark":       # a dark-bodied Pokémon in colour, like Kilowattrel: near-black, thin yellow trim
+        dark = cv2.cvtColor(np.uint8([[[57, 110, 140]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()
+        cv2.circle(img, (100, 1016), 26, dark, -1)
+        cv2.circle(img, (100, 1016), 9, (30, 30, 35), -1)
+        cv2.line(img, (76, 1004), (124, 1004), (40, 200, 230), 2)
+    else:                        # white body with a purple patch
+        cv2.circle(img, (100, 1016), 26, (250, 250, 250), -1)
+        cv2.circle(img, (92, 1008), 10, (160, 90, 140), -1)
+    return img, Word("EVOLVE", 140, 1003, 103, 27, 0.9)
 
 
 def w(text, x, y, width=None, h=40):
@@ -58,6 +79,34 @@ class ParserTests(unittest.TestCase):
     def test_detail_reads_family_candy_above_label(self):
         words = [w("Dragonair", 400, 900, h=80), w("48,210", 200, 1240), w("STARDUST", 200, 1320),
                  w("60", 760, 1240), w("DRATINI", 640, 1320), w("CANDY", 820, 1320), w("EVOLVE", 450, 1760)]
+        self.assertEqual(parse_detail(words, M, SPECIES).candy, {"DRATINI": 60})
+
+    def test_evolve_button_sprite_colour_or_silhouette(self):
+        self.assertTrue(evolve_sprite_caught(*evolve_button("colour")))
+        self.assertFalse(evolve_sprite_caught(*evolve_button("silhouette")))
+        self.assertTrue(evolve_sprite_caught(*evolve_button("dark")))  # real Kilowattrel misread before
+
+    def test_evolve_button_grey_is_unknown(self):
+        # the button greys out when the evolution is unaffordable; the sprite stays as it was
+        img, ev = evolve_button("silhouette")
+        button = np.all(img == img[980, 300], axis=2)
+        img[button] = (215, 218, 220)
+        self.assertIsNone(evolve_sprite_caught(img, ev))
+
+    def test_detail_reads_evolution_never_caught_from_silhouette(self):
+        img, ev = evolve_button("silhouette")
+        words = [w("Dratini", 200, 400, h=80), w("60", 300, 600), w("DRATINI", 250, 680), w("CANDY", 420, 680), ev]
+        r = parse_detail(words, M, SPECIES, img)
+        self.assertEqual((r.candy, r.dex_not_caught, r.dex_caught), ({"DRATINI": 60}, {"DRAGONAIR"}, set()))
+        img, ev = evolve_button("colour")
+        self.assertEqual(parse_detail(words[:-1] + [ev], M, SPECIES, img).dex_caught, {"DRAGONAIR"})
+
+    def test_detail_ignores_candy_xl_label_wrapped_onto_next_line(self):
+        # narrow phones: "DRATINI CANDY" on one line, "XL" centred under it, XL count above
+        words = [w("48,210", 100, 1240), w("STARDUST", 100, 1320),
+                 w("60", 460, 1240), w("DRATINI", 380, 1320), w("CANDY", 550, 1320),
+                 w("7", 820, 1240), w("DRATINI", 740, 1320), w("CANDY", 910, 1320), w("XL", 830, 1370),
+                 w("EVOLVE", 450, 1760)]
         self.assertEqual(parse_detail(words, M, SPECIES).candy, {"DRATINI": 60})
 
     def test_storage_pairs_cp_in_same_cell(self):

@@ -1,0 +1,295 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rare Candy Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #101828;
+  --ink-2: #4a5468;
+  --ink-3: #6b7588;
+  --line: #dfe4ec;
+  --grid: #e8ecf2;
+  --seq-1: #1f5fbf;
+  --seq-2: #5b8fd8;
+  --seq-3: #93b5e6;
+  --seq-4: #c3d6f2;
+  --spare: #e8ecf2;
+  --warn-bg: #fff4dc;
+  --warn-ink: #6b4500;
+  --warn-line: #f0d28a;
+  --good: #1a7a46;
+  --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1219; --surface: #151c26; --ink: #eef2f8; --ink-2: #b4bdcc; --ink-3: #8c97aa;
+    --line: #263041; --grid: #1f2836;
+    --seq-1: #4f8fe8; --seq-2: #3a6db5; --seq-3: #2c5088; --seq-4: #233d68; --spare: #232d3c;
+    --warn-bg: #2d2410; --warn-ink: #f2d796; --warn-line: #5a4713; --good: #4cc383;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1219; --surface: #151c26; --ink: #eef2f8; --ink-2: #b4bdcc; --ink-3: #8c97aa;
+  --line: #263041; --grid: #1f2836;
+  --seq-1: #4f8fe8; --seq-2: #3a6db5; --seq-3: #2c5088; --seq-4: #233d68; --spare: #232d3c;
+  --warn-bg: #2d2410; --warn-ink: #f2d796; --warn-line: #5a4713; --good: #4cc383;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 30px; line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-size: 17px; }
+.sub { color: var(--ink-2); margin: 6px 0 0; max-width: 62ch; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }
+.panel > h2 + p { color: var(--ink-3); margin: 4px 0 14px; font-size: 13px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.stat .k { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.stat .v { font-family: var(--mono); font-size: 28px; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 14px; color: var(--ink-3); }
+.stat .n { font-size: 12px; color: var(--ink-3); }
+.grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* ranked bars */
+.rank { display: flex; flex-direction: column; gap: 14px; }
+.row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: center; cursor: default; }
+.row .name { font-weight: 500; }
+.row .name span { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; }
+.track { position: relative; height: 26px; background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), var(--grid) calc(25% - 1px) 25%); }
+.bar { height: 100%; background: var(--seq-1); border-radius: 0 4px 4px 0; min-width: 2px; transition: opacity .15s; }
+.val { position: absolute; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 12px; padding-left: 6px; white-space: nowrap; }
+.rank:hover .row:not(:hover) .bar { opacity: .45; }
+.row:hover .bar, .row:focus-visible .bar { opacity: 1; }
+.axis { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; margin-top: 6px; }
+.axis div { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.tip { margin-top: 12px; min-height: 40px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 10px; }
+
+/* budget */
+.budget { display: flex; gap: 2px; height: 34px; }
+.budget i { display: block; height: 100%; border-radius: 3px; }
+.legend { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.legend li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; }
+.legend .sw { width: 12px; height: 12px; border-radius: 2px; }
+
+/* paths */
+.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.path { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.path .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.path .rk { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.step { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chip { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 8px; font-size: 13px; }
+.chip.to { border-color: var(--seq-2); }
+.cost { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-left: auto; }
+.trade { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill { font-size: 12px; font-weight: 500; color: var(--good); border: 1px solid currentColor; border-radius: 99px; padding: 0 10px; }
+
+.warn { background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); border-radius: 8px; padding: 14px 16px; }
+.warn b { font-family: var(--display); }
+.warn p { margin: 4px 0 0; }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 420px; }
+th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 10px; border-bottom: 1px solid var(--grid); }
+td.r, th.r { text-align: right; }
+.foot { color: var(--ink-3); font-size: 12px; }
+.empty { color: var(--ink-3); font-size: 13px; }
+h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: var(--ink-2); }
+[hidden] { display: none !important; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Rare Candy Planner</h1>
+    <p class="sub" id="source"></p>
+  </header>
+  <div class="warn" id="warn" role="note" hidden></div>
+  <section class="stats" id="stats" aria-label="Summary"></section>
+  <div class="grid2">
+    <section class="panel">
+      <h2>Where the candy goes, ranked</h2>
+      <p>Plan value per family. Hover a row for the cost.</p>
+      <div class="rank" id="rank"></div>
+      <div class="axis" id="axis"></div>
+      <div class="tip" id="tip"></div>
+    </section>
+    <section class="panel">
+      <h2>Rare Candy budget</h2>
+      <p id="budget-sub"></p>
+      <div class="budget" id="budget" role="img"></div>
+      <ul class="legend" id="legend"></ul>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>Evolution order</h2>
+    <p>Do these in this order. Value per candy is plan value divided by candy spent.</p>
+    <div class="paths" id="paths"></div>
+    <div id="free"></div>
+  </section>
+  <div class="grid2">
+    <section class="panel">
+      <h2>Trade instead of spending candy</h2>
+      <p>Trading evolves these for free.</p>
+      <div id="trade"></div>
+    </section>
+    <section class="panel">
+      <h2>Not in the plan</h2>
+      <p>In the inventory but not evolved this round.</p>
+      <div id="skipped"></div>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>Scanned Pokémon</h2>
+    <p id="inv-sub"></p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Species</th><th>Label</th><th>Plan</th></tr></thead>
+        <tbody id="inv"></tbody>
+      </table>
+    </div>
+  </section>
+  <p class="foot">OCR makes mistakes. Review the inventory file before relying on the numbers.</p>
+</div>
+
+<script>
+var DATA = /*DATA*/null;
+var $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function title(s) { return s.replace(/_/g, ' ').toLowerCase().replace(/(^| )\w/g, function (m) { return m.toUpperCase(); }); }
+function fmt(n) { return Math.round(n).toLocaleString(); }
+function arrow(into) { into.appendChild(document.createTextNode(' → ')); }
+// the Pokémon being evolved (Naclstack), not the family it belongs to (Nacli)
+function who(f) {
+  var names = [];
+  f.paths.forEach(function (p) { var n = title(p.species); if (names.indexOf(n) < 0) names.push(n); });
+  return names.length ? names.join(" / ") : title(f.family);
+}
+var SEQ = ['var(--seq-1)', 'var(--seq-2)', 'var(--seq-3)', 'var(--seq-4)'];
+
+var spend = DATA.families.filter(function (f) { return f.rare_candy > 0; });
+var own = DATA.families.filter(function (f) { return f.rare_candy === 0; });
+spend.sort(function (a, b) { return b.value - a.value; });
+own.sort(function (a, b) { return b.value - a.value; });
+
+$('source').textContent = (DATA.source ? 'Plan built from ' + DATA.source + '. ' : '') +
+  'Rare Candy is ranked by the walking distance each family saves.';
+
+if (DATA.missing_candy.length) {
+  var w = $('warn'); w.hidden = false;
+  w.appendChild(el('b', null, 'Candy counts are missing.'));
+  w.appendChild(el('p', null, 'No owned-candy count for ' + DATA.missing_candy.map(title).join(', ') +
+    '. These can still evolve into a species you don’t have, but the plan assumes you have none of ' +
+    'their candy, so it may skip them or show more Rare Candy than they need. ' +
+    'Open one detail screen per family in the recording, or add the counts to the inventory file.'));
+}
+
+[['Rare Candy used', DATA.used + ' / ' + DATA.available, 'check against the game'],
+ ['Plan value', fmt(DATA.total_value), 'km-equivalent of buddy walking'],
+ ['Families to evolve', String(spend.length + own.length), spend.length + ' with Rare Candy, ' + own.length + ' with your own candy'],
+ ['Free by trading', String(DATA.trade.length), 'evolutions to do by trade']
+].forEach(function (s) {
+  var d = el('div', 'stat'); d.appendChild(el('div', 'k', s[0]));
+  d.appendChild(el('div', 'v', s[1])); d.appendChild(el('div', 'n', s[2])); $('stats').appendChild(d);
+});
+
+// ranked bars on a rounded scale
+var peak = Math.max.apply(null, spend.map(function (f) { return f.value; }).concat([1]));
+var mag = Math.pow(10, Math.floor(Math.log10(peak)));
+var max = Math.ceil(peak / mag * 2) / 2 * mag;
+var tip = $('tip');
+if (!spend.length) $('rank').appendChild(el('p', 'empty', 'No Rare Candy spend recommended.'));
+spend.forEach(function (f, i) {
+  var pct = f.value / max * 100;
+  var row = el('div', 'row'); row.tabIndex = 0;
+  var name = el('div', 'name', who(f)); name.appendChild(el('span', null, fmt(f.rare_candy) + ' Rare Candy'));
+  var track = el('div', 'track'); var bar = el('div', 'bar'); bar.style.width = pct + '%'; track.appendChild(bar);
+  var val = el('span', 'val', fmt(f.value));
+  if (pct > 85) { val.style.right = '6px'; val.style.color = '#fff'; } else { val.style.left = pct + '%'; }
+  track.appendChild(val); row.appendChild(name); row.appendChild(track);
+  var show = function () {
+    tip.textContent = '#' + (i + 1) + ' ' + who(f) + ': ' + fmt(f.candy_used) + ' candy (' + fmt(f.candy_owned) +
+      ' owned + ' + fmt(f.rare_candy) + ' Rare Candy), ' + f.value_per_candy.toFixed(1) +
+      ' value per candy, saves about ' + fmt(f.km_saved) + ' km.';
+  };
+  row.addEventListener('mouseenter', show); row.addEventListener('focus', show);
+  $('rank').appendChild(row);
+});
+if (spend.length) {
+  var ax = el('div'); $('axis').appendChild(el('span')); $('axis').appendChild(ax);
+  for (var t = 0; t <= 4; t++) ax.appendChild(el('span', null, fmt(max * t / 4)));
+  tip.textContent = 'Hover or focus a row to see its cost.';
+} else { $('axis').hidden = true; tip.hidden = true; }
+
+// budget
+var left = DATA.available - DATA.used;
+var segs = spend.map(function (f, i) { return { n: who(f), v: f.rare_candy, c: SEQ[Math.min(i, SEQ.length - 1)] }; });
+if (left > 0) segs.push({ n: 'Left over', v: left, c: 'var(--spare)', edge: true });
+$('budget-sub').textContent = DATA.available + ' available, ' + DATA.used + ' spent.';
+$('budget').setAttribute('aria-label', 'Budget: ' + segs.map(function (s) { return s.n + ' ' + s.v; }).join(', '));
+segs.forEach(function (s) {
+  var b = el('i'); b.style.flex = String(s.v); b.style.background = s.c; $('budget').appendChild(b);
+  var li = el('li'); var sw = el('span', 'sw'); sw.style.background = s.c; if (s.edge) sw.style.border = '1px solid var(--line)';
+  li.appendChild(sw); li.appendChild(el('span', null, s.n)); li.appendChild(el('span', 'num', fmt(s.v))); $('legend').appendChild(li);
+});
+
+// evolution order
+function pathCards(list, into, startRank) {
+  list.forEach(function (f, i) {
+    var c = el('div', 'path'); var head = el('div', 'top'); head.appendChild(el('b', null, who(f)));
+    head.appendChild(el('span', 'rk', (startRank ? '#' + (startRank + i) + ' · ' : '') + f.value_per_candy.toFixed(1) + ' per candy'));
+    c.appendChild(head);
+    f.paths.forEach(function (p) {
+      var s = el('div', 'step'); s.appendChild(el('span', 'chip', title(p.species) + ' ' + p.label));
+      p.steps.forEach(function (st) { arrow(s); s.appendChild(el('span', 'chip to', title(st.to))); });
+      s.appendChild(el('span', 'cost', fmt(p.candy))); c.appendChild(s);
+      var extras = [];
+      p.steps.forEach(function (st) {
+        if (st.item) extras.push('needs ' + title(st.item.replace(/^ITEM_/, '')));
+        st.notes.forEach(function (n) { extras.push(n); });
+      });
+      if (extras.length) c.appendChild(el('div', 'foot', extras.join('; ')));
+    });
+    into.appendChild(c);
+  });
+}
+if (!spend.length && !own.length) $('paths').appendChild(el('p', 'empty', 'No evolutions recommended.'));
+pathCards(spend, $('paths'), 1);
+if (own.length) {
+  $('free').appendChild(el('h3', null, 'Already affordable with your own candy'));
+  var g = el('div', 'paths'); $('free').appendChild(g); pathCards(own, g, 0);
+}
+
+// trade
+if (!DATA.trade.length) $('trade').appendChild(el('p', 'empty', 'Nothing to trade.'));
+DATA.trade.forEach(function (t) {
+  var d = el('div', 'trade'); d.appendChild(el('span', 'pill', 'Free'));
+  d.appendChild(el('span', 'chip', title(t.species) + ' ' + t.label));
+  if (t.frm !== t.species) { arrow(d); d.appendChild(el('span', 'chip to', title(t.frm))); }
+  arrow(d); d.appendChild(el('span', 'chip to', title(t.to)));
+  d.appendChild(el('span', 'foot', 'saves ' + fmt(t.candy) + ' candy'));
+  $('trade').appendChild(d);
+});
+
+// skipped + inventory
+var skipped = DATA.pokemon.filter(function (p) { return p.status === 'Not planned'; });
+$('skipped').appendChild(skipped.length
+  ? el('div', 'foot', skipped.map(function (p) { return title(p.species) + ' ' + p.label; }).join(', ') + '.')
+  : el('p', 'empty', 'Everything is in the plan or fully evolved.'));
+if (DATA.unknown.length) $('skipped').appendChild(el('div', 'foot', 'Not in species data: ' + DATA.unknown.map(title).join(', ') + '.'));
+$('inv-sub').textContent = DATA.pokemon.length + ' Pokémon in the inventory.';
+DATA.pokemon.forEach(function (p) {
+  var tr = el('tr'); tr.appendChild(el('td', null, title(p.species))); tr.appendChild(el('td', 'num', p.label));
+  tr.appendChild(el('td', null, p.status)); $('inv').appendChild(tr);
+});
+</script>

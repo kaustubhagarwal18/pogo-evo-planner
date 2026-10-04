@@ -5,10 +5,12 @@ build/
 dist/
 .ruff_cache/
 .pytest_cache/
+.DS_Store
 
 # local data and captures (may contain personal info)
 data/latest.json
 data/*.tmp
 mock/
 captures/
-inventory.json
+/inventory*.json
+/dashboard.html

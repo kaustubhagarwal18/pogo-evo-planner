@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rarecandy"
+name = "pogo-evo-planner"
 version = "0.1.0"
 description = "Pokémon GO evolution and Rare Candy planner, fed by OCR of screenshots and screen recordings"
 readme = "README.md"
@@ -15,17 +15,17 @@ dependencies = []  # the planner is pure stdlib
 # screen scanning: OpenCV for frames and image handling
 scan = ["opencv-python-headless>=4.8", "numpy>=1.24"]
 # recommended OCR + fuzzy matching (without these, Tesseract and difflib are used)
-ocr = ["rarecandy[scan]", "rapidocr>=2", "onnxruntime>=1.16", "rapidfuzz>=3"]
-dev = ["rarecandy[scan]", "pillow>=10", "pytest>=8", "ruff>=0.5"]
+ocr = ["pogo-evo-planner[scan]", "rapidocr>=2", "onnxruntime>=1.16", "rapidfuzz>=3"]
+dev = ["pogo-evo-planner[scan]", "pillow>=10", "pytest>=8", "ruff>=0.5"]
 
 [project.scripts]
-rarecandy = "rarecandy.cli:main"
+pogo-evo-planner = "pogo_evo_planner.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["rarecandy*"]
+include = ["pogo_evo_planner*"]
 
 [tool.setuptools.package-data]
-rarecandy = ["data/*.json"]
+pogo_evo_planner = ["data/*.json", "data/*.html"]
 
 [tool.ruff]
 line-length = 120

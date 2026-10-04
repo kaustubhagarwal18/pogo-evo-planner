@@ -8,7 +8,7 @@ Open the item bag, scroll until **Rare Candy** and its count are visible, take a
 
 ## 2. One screen recording
 
-Record these in one go (or several recordings; pass them all to `rarecandy scan`):
+Record these in one go (or several recordings; pass them all to `pogo-evo-planner scan`):
 
 1. **Storage grid.** Open your Pokémon list and scroll slowly from top to bottom.
    Tip: use the in-game search to filter first (e.g. to the families you care about),
@@ -23,7 +23,7 @@ Pause briefly on each screen: the scanner keeps the sharpest frame of each pause
 ## Then
 
 ```bash
-rarecandy scan bag.png recording.mp4 -o inventory.json
+pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
 ```
 
 Read the warnings it prints (missing families, conflicting readings), fix anything wrong

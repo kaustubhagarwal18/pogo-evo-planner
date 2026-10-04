@@ -40,6 +40,7 @@ _CONDITION_NOTES = {
 
 
 def _species_key(ps: dict) -> str:
+    """Species id for a game master entry: the form name for regional/alternate forms, else the Pokémon id."""
     form = ps.get("form")
     if form and not str(form).endswith("_NORMAL"):
         return str(form)
@@ -47,6 +48,7 @@ def _species_key(ps: dict) -> str:
 
 
 def _target_key(branch: dict) -> str:
+    """Species id an evolution branch leads to, using the form name when it isn't the normal form."""
     form = branch.get("form")
     if form and not str(form).endswith("_NORMAL"):
         return str(form)

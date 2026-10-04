@@ -13,14 +13,14 @@ test-fast:          ## skip the slow OCR end-to-end test
 	SKIP_SLOW=1 python -m unittest discover -s tests -t .
 
 lint:
-	ruff check rarecandy tests
+	ruff check pogo_evo_planner tests
 
 gamemaster:         ## download the latest datamined game master to data/latest.json
 	./scripts/fetch_gamemaster.sh
 
 demo:               ## plan from the bundled example inventory
-	rarecandy plan examples/inventory_sample.json
+	pogo-evo-planner plan examples/inventory_sample.json
 
 mock:               ## render synthetic screens + recording into mock/ and scan them
 	python tests/mockscreens.py mock
-	rarecandy scan mock/bag.png mock/recording.mp4 -o mock/inventory.json --plan
+	pogo-evo-planner scan mock/bag.png mock/recording.mp4 -o mock/inventory.json --plan

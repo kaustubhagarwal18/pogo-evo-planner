@@ -8,11 +8,13 @@ import numpy as np
 
 
 def _thumb(img: np.ndarray) -> np.ndarray:
+    """Small greyscale thumbnail used to compare frames cheaply."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     return cv2.resize(gray, (90, 195), interpolation=cv2.INTER_AREA).astype(np.int16)
 
 
 def _sharpness(img: np.ndarray) -> float:
+    """Variance of the Laplacian: higher means a sharper, less motion-blurred frame."""
     return float(cv2.Laplacian(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var())
 
 
