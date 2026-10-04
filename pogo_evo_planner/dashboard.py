@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .inventory import Inventory
-from .planner import Plan, families_missing_candy
+from .planner import Plan, families_missing_candy, owned_species
 
 TEMPLATE = Path(__file__).resolve().parent / "data" / "dashboard.html"
 
@@ -13,6 +13,7 @@ TEMPLATE = Path(__file__).resolve().parent / "data" / "dashboard.html"
 def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict:
     """Flatten a plan and its inventory into the JSON the dashboard template renders."""
     planned: dict[tuple[str, str], str] = {}
+    registered = (inv.pokedex | owned_species(inv, species)) - inv.not_caught
     families = []
     for f in p.families:
         paths = []
@@ -21,8 +22,8 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
                 planned[(path.specimen.species, path.specimen.label)] = "Evolve to " + path.steps[-1].to.replace("_", " ").title()
             paths.append({
                 "species": path.specimen.species, "label": path.specimen.label, "candy": path.candy,
-                "steps": [{"frm": s.frm, "to": s.to, "candy": s.candy, "item": s.item, "notes": list(s.notes)}
-                          for s in path.steps],
+                "steps": [{"frm": s.frm, "to": s.to, "candy": s.candy, "item": s.item, "notes": list(s.notes),
+                           "new_dex": s.to not in registered} for s in path.steps],
             })
         families.append({
             "family": f.family, "candy_used": f.candy_used, "candy_owned": f.candy_owned,
@@ -44,12 +45,17 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
             return "Not in species data"
         return "Not planned" if species[sp.species].get("evolutions") else "Fully evolved"
 
+    shown = {sp.species for sp in inv.pokemon} | {s for f in families for path in f["paths"]
+                                                  for s in [path["species"]] + [st["to"] for st in path["steps"]]}
+    shown |= {s for t in trade for s in (t["frm"], t["to"])}
     return {
         "source": source,
         "available": p.rare_candy_available, "used": p.rare_candy_used, "total_value": p.total_value,
         "families": families, "trade": trade, "unknown": p.unknown_species,
         "missing_candy": families_missing_candy(inv, species),
         "pokemon": [{"species": s.species, "label": s.label, "status": status(s)} for s in inv.pokemon],
+        # national dex numbers pick each species' sprite
+        "dex": {s: species[s]["dex"] for s in sorted(shown) if "dex" in species.get(s, {})},
     }
 
 

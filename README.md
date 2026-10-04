@@ -1,5 +1,17 @@
 # pogo-evo-planner
 
+[![ci](https://github.com/kaustubhagarwal18/pogo-evo-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/kaustubhagarwal18/pogo-evo-planner/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+![OpenCV 5.0](https://img.shields.io/badge/OpenCV-5.0-5C3EE8?logo=opencv&logoColor=white)
+![NumPy 2.5](https://img.shields.io/badge/NumPy-2.5-013243?logo=numpy&logoColor=white)
+![RapidOCR 3.9](https://img.shields.io/badge/RapidOCR-3.9-orange)
+![ONNX Runtime 1.30](https://img.shields.io/badge/ONNX_Runtime-1.30-005CED?logo=onnx&logoColor=white)
+![RapidFuzz 3.14](https://img.shields.io/badge/RapidFuzz-3.14-blue)
+![Tesseract 5.5](https://img.shields.io/badge/Tesseract-5.5_%28fallback%29-lightgrey)
+
 Tells a Pokémon GO player which evolutions to do and where their Rare Candy saves the
 most effort, from screenshots and a screen recording of their own game.
 
@@ -160,10 +172,13 @@ What each screen provides:
 ### Dashboard (`pogo_evo_planner/dashboard.py`)
 
 Renders the same plan as one self-contained HTML file from `pogo_evo_planner/data/dashboard.html`:
-summary, families ranked by value, the Rare Candy budget, evolution order, trades, skipped
-Pokémon, and the scanned inventory with what the plan does to each. It flags families whose
-candy count wasn't scanned. The file lists your Pokémon, so it is gitignored like
-`inventory.json`.
+the species the plan evolves into, summary, families ranked by value, the Rare Candy budget,
+evolution order (with a "New" tag where an evolution adds a Pokédex entry), trades, skipped
+Pokémon, and the scanned inventory, filterable by what the plan does to each. It flags families
+whose candy count wasn't scanned. Pokémon sprites and artwork load from
+[PokeAPI's sprite repository](https://github.com/PokeAPI/sprites) by national dex number when
+online; offline, each shows its initial instead. The file lists your Pokémon, so it is gitignored
+like `inventory.json`.
 
 ## Data
 

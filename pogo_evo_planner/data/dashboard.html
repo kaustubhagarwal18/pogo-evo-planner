@@ -18,10 +18,14 @@
   --seq-3: #93b5e6;
   --seq-4: #c3d6f2;
   --spare: #e8ecf2;
+  --halo: #e9f0fa;
+  --hero-1: #dce8fb;
+  --hero-2: #f3f5f8;
   --warn-bg: #fff4dc;
   --warn-ink: #6b4500;
   --warn-line: #f0d28a;
   --good: #1a7a46;
+  --good-bg: #e3f4ea;
   --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -31,7 +35,8 @@
     --bg: #0d1219; --surface: #151c26; --ink: #eef2f8; --ink-2: #b4bdcc; --ink-3: #8c97aa;
     --line: #263041; --grid: #1f2836;
     --seq-1: #4f8fe8; --seq-2: #3a6db5; --seq-3: #2c5088; --seq-4: #233d68; --spare: #232d3c;
-    --warn-bg: #2d2410; --warn-ink: #f2d796; --warn-line: #5a4713; --good: #4cc383;
+    --halo: #1c2738; --hero-1: #15243b; --hero-2: #0d1219;
+    --warn-bg: #2d2410; --warn-ink: #f2d796; --warn-line: #5a4713; --good: #4cc383; --good-bg: #12301f;
     color-scheme: dark;
   }
 }
@@ -39,70 +44,114 @@
   --bg: #0d1219; --surface: #151c26; --ink: #eef2f8; --ink-2: #b4bdcc; --ink-3: #8c97aa;
   --line: #263041; --grid: #1f2836;
   --seq-1: #4f8fe8; --seq-2: #3a6db5; --seq-3: #2c5088; --seq-4: #233d68; --spare: #232d3c;
-  --warn-bg: #2d2410; --warn-ink: #f2d796; --warn-line: #5a4713; --good: #4cc383;
+  --halo: #1c2738; --hero-1: #15243b; --hero-2: #0d1219;
+  --warn-bg: #2d2410; --warn-ink: #f2d796; --warn-line: #5a4713; --good: #4cc383; --good-bg: #12301f;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
-.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 20px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; display: flex; flex-direction: column; gap: 20px; }
 h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
-h1 { font-size: 30px; line-height: 1.1; letter-spacing: -0.01em; }
+h1 { font-size: 32px; line-height: 1.1; letter-spacing: -0.01em; }
 h2 { font-size: 17px; }
-.sub { color: var(--ink-2); margin: 6px 0 0; max-width: 62ch; }
+.sub { color: var(--ink-2); margin: 8px 0 0; max-width: 62ch; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }
 .panel > h2 + p { color: var(--ink-3); margin: 4px 0 14px; font-size: 13px; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
-.stat .k { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
-.stat .v { font-family: var(--mono); font-size: 28px; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
-.stat .v small { font-size: 14px; color: var(--ink-3); }
-.stat .n { font-size: 12px; color: var(--ink-3); }
 .grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; }
 @media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
 
+/* sprites: a soft disc behind each Pokémon; the initial shows when the image can't load */
+.spr { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background: var(--halo); overflow: hidden; vertical-align: middle; }
+.spr img { width: 100%; height: 100%; object-fit: contain; transform: scale(1.3); }
+.spr.art img { transform: none; padding: 8%; }
+.spr.none::before { content: attr(data-initial); font-family: var(--display); font-weight: 700; color: var(--ink-3); }
+
+/* hero */
+.hero { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; padding: 24px;
+        background: radial-gradient(120% 140% at 100% 0%, var(--hero-1), var(--hero-2) 70%); }
+.hero .eyebrow { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
+.hero .eyebrow img { width: 28px; height: 28px; image-rendering: pixelated; }
+.gallery { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.gallery figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; text-align: center; }
+.gallery figcaption { font-size: 12px; line-height: 1.25; color: var(--ink-2); }
+.gallery .spr { background: var(--surface); box-shadow: 0 1px 0 var(--line), 0 0 0 1px var(--line); }
+.gallery-note { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
+/* stats */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.stat .k { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.stat .v { font-family: var(--mono); font-size: 28px; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 16px; color: var(--ink-3); }
+.stat .n { font-size: 12px; color: var(--ink-3); }
+.meter { height: 6px; border-radius: 99px; background: var(--spare); margin: 8px 0 6px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--seq-1); border-radius: 99px; }
+
 /* ranked bars */
-.rank { display: flex; flex-direction: column; gap: 14px; }
-.row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: center; cursor: default; }
-.row .name { font-weight: 500; }
+.rank { display: flex; flex-direction: column; gap: 12px; }
+.row, .axis { display: grid; grid-template-columns: 40px 104px minmax(0, 1fr); gap: 10px; align-items: center; }
+.row { cursor: default; border-radius: 8px; outline-offset: 4px; }
+.row .name { font-weight: 500; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
 .row .name span { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; }
 .track { position: relative; height: 26px; background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), var(--grid) calc(25% - 1px) 25%); }
-.bar { height: 100%; background: var(--seq-1); border-radius: 0 4px 4px 0; min-width: 2px; transition: opacity .15s; }
+.bar { height: 100%; background: linear-gradient(90deg, var(--seq-2), var(--seq-1)); border-radius: 0 6px 6px 0; min-width: 2px; transition: opacity .15s; }
 .val { position: absolute; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 12px; padding-left: 6px; white-space: nowrap; }
 .rank:hover .row:not(:hover) .bar { opacity: .45; }
 .row:hover .bar, .row:focus-visible .bar { opacity: 1; }
-.axis { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; margin-top: 6px; }
+.axis { margin-top: 6px; }
 .axis div { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 .tip { margin-top: 12px; min-height: 40px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 10px; }
 
 /* budget */
 .budget { display: flex; gap: 2px; height: 34px; }
-.budget i { display: block; height: 100%; border-radius: 3px; }
-.legend { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px; }
-.legend li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; }
-.legend .sw { width: 12px; height: 12px; border-radius: 2px; }
+.budget i { display: block; height: 100%; border-radius: 4px; }
+.legend { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.legend li { display: grid; grid-template-columns: 12px 26px 1fr auto; gap: 10px; align-items: center; }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; }
 
-/* paths */
-.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-.path { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-.path .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.path .rk { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-.step { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.chip { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 8px; font-size: 13px; }
-.chip.to { border-color: var(--seq-2); }
-.cost { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-left: auto; }
-.trade { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* evolution cards */
+.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.path { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+        background: linear-gradient(180deg, var(--halo), transparent 55%); }
+.path .top { display: flex; align-items: center; gap: 8px; }
+.path .top b { font-family: var(--display); font-size: 15px; }
+.badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 99px; background: var(--seq-1); color: #fff; font-family: var(--mono); font-size: 12px; font-weight: 500; }
+.path .rk { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-left: auto; white-space: nowrap; }
+.evo { display: flex; align-items: flex-start; justify-content: center; gap: 4px; padding: 6px 0; }
+.stage { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; width: 96px; }
+.stage .nm { font-size: 13px; font-weight: 500; line-height: 1.25; }
+.stage .lb { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+.go { align-self: center; color: var(--ink-3); font-size: 18px; margin-top: -24px; }
+.new { white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--good); background: var(--good-bg); border-radius: 99px; padding: 0 8px; }
+.path .foot { border-top: 1px dashed var(--line); padding-top: 8px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.notes { font-size: 12px; color: var(--ink-2); }
+
+/* trade, skipped */
+.trade { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
 .pill { font-size: 12px; font-weight: 500; color: var(--good); border: 1px solid currentColor; border-radius: 99px; padding: 0 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px 2px 2px; font-size: 13px; }
+.chip .lb { color: var(--ink-3); font-family: var(--mono); font-size: 11px; }
 
-.warn { background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); border-radius: 8px; padding: 14px 16px; }
+.warn { background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); border-radius: 12px; padding: 14px 16px; }
 .warn b { font-family: var(--display); }
 .warn p { margin: 4px 0 0; }
 
+/* inventory table */
+.tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.tools button { font: inherit; font-size: 13px; color: var(--ink-2); background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px; cursor: pointer; }
+.tools button[aria-pressed="true"] { color: var(--surface); background: var(--ink); border-color: var(--ink); }
 .tablewrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; min-width: 420px; }
 th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--line); }
-td { padding: 7px 10px; border-bottom: 1px solid var(--grid); }
-td.r, th.r { text-align: right; }
+td { padding: 5px 10px; border-bottom: 1px solid var(--grid); }
+td .who { display: flex; align-items: center; gap: 10px; }
+.st { font-size: 12px; border-radius: 99px; padding: 1px 10px; white-space: nowrap; }
+.st.plan { color: var(--seq-1); background: var(--halo); font-weight: 500; }
+.st.trade { color: var(--good); background: var(--good-bg); font-weight: 500; }
+.st.bad { color: var(--warn-ink); background: var(--warn-bg); }
+.st.idle { color: var(--ink-3); }
 .foot { color: var(--ink-3); font-size: 12px; }
 .empty { color: var(--ink-3); font-size: 13px; }
 h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: var(--ink-2); }
@@ -110,9 +159,12 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
 </style>
 
 <div class="wrap">
-  <header>
+  <header class="hero">
+    <div class="eyebrow"><img alt="" id="candy-icon">Pokémon GO evolution plan</div>
     <h1>Rare Candy Planner</h1>
     <p class="sub" id="source"></p>
+    <div class="gallery" id="gallery"></div>
+    <p class="gallery-note" id="gallery-note" hidden></p>
   </header>
   <div class="warn" id="warn" role="note" hidden></div>
   <section class="stats" id="stats" aria-label="Summary"></section>
@@ -152,6 +204,7 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
   <section class="panel">
     <h2>Scanned Pokémon</h2>
     <p id="inv-sub"></p>
+    <div class="tools" id="filters" role="group" aria-label="Filter"></div>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Species</th><th>Label</th><th>Plan</th></tr></thead>
@@ -159,7 +212,9 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
       </table>
     </div>
   </section>
-  <p class="foot">OCR makes mistakes. Review the inventory file before relying on the numbers.</p>
+  <p class="foot">OCR makes mistakes. Review the inventory file before relying on the numbers.
+    Sprites load from <a href="https://github.com/PokeAPI/sprites">PokeAPI</a> when online.
+    Pokémon © Nintendo, Creatures, GAME FREAK and The Pokémon Company.</p>
 </div>
 
 <script>
@@ -168,12 +223,33 @@ var $ = function (id) { return document.getElementById(id); };
 function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function title(s) { return s.replace(/_/g, ' ').toLowerCase().replace(/(^| )\w/g, function (m) { return m.toUpperCase(); }); }
 function fmt(n) { return Math.round(n).toLocaleString(); }
-function arrow(into) { into.appendChild(document.createTextNode(' → ')); }
+function arrow(into) { into.appendChild(el('span', 'go', '→')); }
 // the Pokémon being evolved (Naclstack), not the family it belongs to (Nacli)
 function who(f) {
   var names = [];
   f.paths.forEach(function (p) { var n = title(p.species); if (names.indexOf(n) < 0) names.push(n); });
   return names.length ? names.join(" / ") : title(f.family);
+}
+// species each family's plan ends on (Garganacl), first path first
+function targets(f) {
+  var out = [];
+  f.paths.forEach(function (p) { var t = p.steps.length && p.steps[p.steps.length - 1].to; if (t && out.indexOf(t) < 0) out.push(t); });
+  return out;
+}
+var SPRITES = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/';
+// art: official artwork (large) instead of the small game sprite
+function sprite(sp, size, art) {
+  var w = el('span', 'spr' + (art ? ' art' : ''));
+  w.style.width = w.style.height = size + 'px';
+  w.style.fontSize = Math.round(size * 0.42) + 'px';
+  w.setAttribute('data-initial', title(sp).charAt(0));
+  var n = DATA.dex && DATA.dex[sp];
+  if (!n) { w.classList.add('none'); return w; }
+  var img = el('img'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.width = img.height = size;
+  img.onerror = function () { img.remove(); w.classList.add('none'); };
+  img.src = SPRITES + (art ? 'pokemon/other/official-artwork/' : 'pokemon/') + n + '.png';
+  w.appendChild(img);
+  return w;
 }
 var SEQ = ['var(--seq-1)', 'var(--seq-2)', 'var(--seq-3)', 'var(--seq-4)'];
 
@@ -182,8 +258,29 @@ var own = DATA.families.filter(function (f) { return f.rare_candy === 0; });
 spend.sort(function (a, b) { return b.value - a.value; });
 own.sort(function (a, b) { return b.value - a.value; });
 
+$('candy-icon').src = SPRITES + 'items/rare-candy.png';
+$('candy-icon').onerror = function () { this.remove(); };
 $('source').textContent = (DATA.source ? 'Plan built from ' + DATA.source + '. ' : '') +
   'Rare Candy is ranked by the walking distance each family saves.';
+
+// hero gallery: every species the plan evolves into
+var newCount = 0, goals = [];
+spend.concat(own).forEach(function (f) {
+  f.paths.forEach(function (p) {
+    if (!p.steps.length) return;
+    var last = p.steps[p.steps.length - 1];
+    if (goals.indexOf(last.to) < 0) { goals.push(last.to); if (last.new_dex) newCount++; }
+  });
+});
+goals.forEach(function (sp) {
+  var fig = el('figure'); fig.appendChild(sprite(sp, 64, true)); fig.appendChild(el('figcaption', null, title(sp)));
+  $('gallery').appendChild(fig);
+});
+if (goals.length) {
+  $('gallery-note').hidden = false;
+  $('gallery-note').textContent = 'The plan evolves into ' + goals.length + ' species' +
+    (newCount ? ', ' + newCount + ' of them new to your Pokédex.' : '.');
+}
 
 if (DATA.missing_candy.length) {
   var w = $('warn'); w.hidden = false;
@@ -194,13 +291,15 @@ if (DATA.missing_candy.length) {
     'Open one detail screen per family in the recording, or add the counts to the inventory file.'));
 }
 
-[['Rare Candy used', DATA.used + ' / ' + DATA.available, 'check against the game'],
- ['Plan value', fmt(DATA.total_value), 'km-equivalent of buddy walking'],
- ['Families to evolve', String(spend.length + own.length), spend.length + ' with Rare Candy, ' + own.length + ' with your own candy'],
- ['Free by trading', String(DATA.trade.length), 'evolutions to do by trade']
+[['Rare Candy used', [DATA.used, ' / ' + DATA.available], 'check against the game', DATA.available ? DATA.used / DATA.available : 0],
+ ['Plan value', [fmt(DATA.total_value)], 'km-equivalent of buddy walking'],
+ ['Families to evolve', [String(spend.length + own.length)], spend.length + ' with Rare Candy, ' + own.length + ' with your own candy'],
+ ['Free by trading', [String(DATA.trade.length)], 'evolutions to do by trade']
 ].forEach(function (s) {
   var d = el('div', 'stat'); d.appendChild(el('div', 'k', s[0]));
-  d.appendChild(el('div', 'v', s[1])); d.appendChild(el('div', 'n', s[2])); $('stats').appendChild(d);
+  var v = el('div', 'v', s[1][0]); if (s[1][1]) v.appendChild(el('small', null, s[1][1])); d.appendChild(v);
+  if (s[3] != null) { var m = el('div', 'meter'); var fill = el('i'); fill.style.width = (s[3] * 100) + '%'; m.appendChild(fill); d.appendChild(m); }
+  d.appendChild(el('div', 'n', s[2])); $('stats').appendChild(d);
 });
 
 // ranked bars on a rounded scale
@@ -212,54 +311,70 @@ if (!spend.length) $('rank').appendChild(el('p', 'empty', 'No Rare Candy spend r
 spend.forEach(function (f, i) {
   var pct = f.value / max * 100;
   var row = el('div', 'row'); row.tabIndex = 0;
+  row.appendChild(sprite(targets(f)[0] || f.family, 40));
   var name = el('div', 'name', who(f)); name.appendChild(el('span', null, fmt(f.rare_candy) + ' Rare Candy'));
   var track = el('div', 'track'); var bar = el('div', 'bar'); bar.style.width = pct + '%'; track.appendChild(bar);
   var val = el('span', 'val', fmt(f.value));
-  if (pct > 85) { val.style.right = '6px'; val.style.color = '#fff'; } else { val.style.left = pct + '%'; }
+  if (pct > 85) { val.style.right = 'calc(' + (100 - pct) + '% + 6px)'; val.style.color = '#fff'; } else { val.style.left = pct + '%'; }
   track.appendChild(val); row.appendChild(name); row.appendChild(track);
   var show = function () {
-    tip.textContent = '#' + (i + 1) + ' ' + who(f) + ': ' + fmt(f.candy_used) + ' candy (' + fmt(f.candy_owned) +
-      ' owned + ' + fmt(f.rare_candy) + ' Rare Candy), ' + f.value_per_candy.toFixed(1) +
-      ' value per candy, saves about ' + fmt(f.km_saved) + ' km.';
+    tip.textContent = '#' + (i + 1) + ' ' + who(f) + ' → ' + targets(f).map(title).join(' / ') + ': ' +
+      fmt(f.candy_used) + ' candy (' + fmt(f.candy_owned) + ' owned + ' + fmt(f.rare_candy) + ' Rare Candy), ' +
+      f.value_per_candy.toFixed(1) + ' value per candy, saves about ' + fmt(f.km_saved) + ' km.';
   };
   row.addEventListener('mouseenter', show); row.addEventListener('focus', show);
   $('rank').appendChild(row);
 });
 if (spend.length) {
-  var ax = el('div'); $('axis').appendChild(el('span')); $('axis').appendChild(ax);
+  var ax = el('div'); $('axis').appendChild(el('span')); $('axis').appendChild(el('span')); $('axis').appendChild(ax);
   for (var t = 0; t <= 4; t++) ax.appendChild(el('span', null, fmt(max * t / 4)));
   tip.textContent = 'Hover or focus a row to see its cost.';
 } else { $('axis').hidden = true; tip.hidden = true; }
 
 // budget
 var left = DATA.available - DATA.used;
-var segs = spend.map(function (f, i) { return { n: who(f), v: f.rare_candy, c: SEQ[Math.min(i, SEQ.length - 1)] }; });
+var segs = spend.map(function (f, i) { return { n: who(f), sp: targets(f)[0] || f.family, v: f.rare_candy, c: SEQ[Math.min(i, SEQ.length - 1)] }; });
 if (left > 0) segs.push({ n: 'Left over', v: left, c: 'var(--spare)', edge: true });
 $('budget-sub').textContent = DATA.available + ' available, ' + DATA.used + ' spent.';
 $('budget').setAttribute('aria-label', 'Budget: ' + segs.map(function (s) { return s.n + ' ' + s.v; }).join(', '));
 segs.forEach(function (s) {
   var b = el('i'); b.style.flex = String(s.v); b.style.background = s.c; $('budget').appendChild(b);
   var li = el('li'); var sw = el('span', 'sw'); sw.style.background = s.c; if (s.edge) sw.style.border = '1px solid var(--line)';
-  li.appendChild(sw); li.appendChild(el('span', null, s.n)); li.appendChild(el('span', 'num', fmt(s.v))); $('legend').appendChild(li);
+  li.appendChild(sw); li.appendChild(s.sp ? sprite(s.sp, 26) : el('span'));
+  li.appendChild(el('span', null, s.n)); li.appendChild(el('span', 'num', fmt(s.v))); $('legend').appendChild(li);
 });
 
 // evolution order
+function stage(sp, sub, art, isNew) {
+  var s = el('div', 'stage'); s.appendChild(sprite(sp, art ? 84 : 60, art));
+  s.appendChild(el('div', 'nm', title(sp)));
+  if (sub) s.appendChild(el('div', 'lb', sub));
+  if (isNew) { var nb = el('span', 'new', 'New'); nb.title = 'Not in your Pokédex yet'; s.appendChild(nb); }
+  return s;
+}
 function pathCards(list, into, startRank) {
   list.forEach(function (f, i) {
-    var c = el('div', 'path'); var head = el('div', 'top'); head.appendChild(el('b', null, who(f)));
-    head.appendChild(el('span', 'rk', (startRank ? '#' + (startRank + i) + ' · ' : '') + f.value_per_candy.toFixed(1) + ' per candy'));
+    var c = el('div', 'path'); var head = el('div', 'top');
+    if (startRank) head.appendChild(el('span', 'badge', String(startRank + i)));
+    head.appendChild(el('b', null, who(f)));
+    head.appendChild(el('span', 'rk', f.value_per_candy.toFixed(1) + ' per candy'));
     c.appendChild(head);
+    var extras = [];
     f.paths.forEach(function (p) {
-      var s = el('div', 'step'); s.appendChild(el('span', 'chip', title(p.species) + ' ' + p.label));
-      p.steps.forEach(function (st) { arrow(s); s.appendChild(el('span', 'chip to', title(st.to))); });
-      s.appendChild(el('span', 'cost', fmt(p.candy))); c.appendChild(s);
-      var extras = [];
+      var e = el('div', 'evo'); e.appendChild(stage(p.species, p.label, false, false));
+      p.steps.forEach(function (st) { arrow(e); e.appendChild(stage(st.to, null, true, st.new_dex)); });
+      c.appendChild(e);
       p.steps.forEach(function (st) {
-        if (st.item) extras.push('needs ' + title(st.item.replace(/^ITEM_/, '')));
-        st.notes.forEach(function (n) { extras.push(n); });
+        if (st.item) extras.push(title(st.to) + ': needs ' + title(st.item.replace(/^ITEM_/, '')));
+        st.notes.forEach(function (n) { extras.push(title(st.to) + ': ' + n); });
       });
-      if (extras.length) c.appendChild(el('div', 'foot', extras.join('; ')));
     });
+    if (extras.length) c.appendChild(el('div', 'notes', extras.join('; ')));
+    var foot = el('div', 'foot');
+    foot.appendChild(el('span', 'num', fmt(f.candy_used) + ' candy'));
+    foot.appendChild(el('span', null, f.rare_candy ? fmt(f.candy_owned) + ' owned + ' + fmt(f.rare_candy) + ' Rare Candy'
+                                                   : 'your own candy (' + fmt(f.candy_owned) + ' owned)'));
+    c.appendChild(foot);
     into.appendChild(c);
   });
 }
@@ -271,25 +386,57 @@ if (own.length) {
 }
 
 // trade
+function chip(sp, label) {
+  var c = el('span', 'chip'); c.appendChild(sprite(sp, 26)); c.appendChild(el('span', null, title(sp)));
+  if (label) c.appendChild(el('span', 'lb', label));
+  return c;
+}
 if (!DATA.trade.length) $('trade').appendChild(el('p', 'empty', 'Nothing to trade.'));
 DATA.trade.forEach(function (t) {
   var d = el('div', 'trade'); d.appendChild(el('span', 'pill', 'Free'));
-  d.appendChild(el('span', 'chip', title(t.species) + ' ' + t.label));
-  if (t.frm !== t.species) { arrow(d); d.appendChild(el('span', 'chip to', title(t.frm))); }
-  arrow(d); d.appendChild(el('span', 'chip to', title(t.to)));
+  d.appendChild(chip(t.species, t.label));
+  if (t.frm !== t.species) { arrow(d); d.appendChild(chip(t.frm)); }
+  arrow(d); d.appendChild(chip(t.to));
   d.appendChild(el('span', 'foot', 'saves ' + fmt(t.candy) + ' candy'));
   $('trade').appendChild(d);
 });
 
-// skipped + inventory
+// skipped
 var skipped = DATA.pokemon.filter(function (p) { return p.status === 'Not planned'; });
-$('skipped').appendChild(skipped.length
-  ? el('div', 'foot', skipped.map(function (p) { return title(p.species) + ' ' + p.label; }).join(', ') + '.')
-  : el('p', 'empty', 'Everything is in the plan or fully evolved.'));
-if (DATA.unknown.length) $('skipped').appendChild(el('div', 'foot', 'Not in species data: ' + DATA.unknown.map(title).join(', ') + '.'));
+if (skipped.length) {
+  // one chip per species: "×3" for several, else the specimen's own label
+  var bySp = {}, order = [];
+  skipped.forEach(function (p) { if (!bySp[p.species]) { bySp[p.species] = []; order.push(p.species); } bySp[p.species].push(p.label); });
+  var sc = el('div', 'chips');
+  order.forEach(function (sp) { var l = bySp[sp]; sc.appendChild(chip(sp, l.length > 1 ? '×' + l.length : l[0])); });
+  $('skipped').appendChild(sc);
+} else $('skipped').appendChild(el('p', 'empty', 'Everything is in the plan or fully evolved.'));
+if (DATA.unknown.length) $('skipped').appendChild(el('p', 'foot', 'Not in species data: ' + DATA.unknown.map(title).join(', ') + '.'));
+
+// inventory, filterable by what the plan does with each Pokémon
+function kind(status) {
+  if (/^Evolve/.test(status)) return 'plan';
+  if (/^Trade/.test(status)) return 'trade';
+  if (/^(Probably|Not in)/.test(status)) return 'bad';
+  return 'idle';
+}
 $('inv-sub').textContent = DATA.pokemon.length + ' Pokémon in the inventory.';
-DATA.pokemon.forEach(function (p) {
-  var tr = el('tr'); tr.appendChild(el('td', null, title(p.species))); tr.appendChild(el('td', 'num', p.label));
-  tr.appendChild(el('td', null, p.status)); $('inv').appendChild(tr);
+var rows = DATA.pokemon.map(function (p) {
+  var tr = el('tr'); var td = el('td'); var w2 = el('span', 'who');
+  w2.appendChild(sprite(p.species, 32)); w2.appendChild(el('span', null, title(p.species))); td.appendChild(w2); tr.appendChild(td);
+  tr.appendChild(el('td', 'num', p.label));
+  var k = kind(p.status); var cell = el('td'); cell.appendChild(el('span', 'st ' + k, p.status)); tr.appendChild(cell);
+  $('inv').appendChild(tr);
+  return { tr: tr, k: k };
+});
+[['all', 'All'], ['plan', 'Evolving'], ['trade', 'Trading'], ['bad', 'Needs a look'], ['idle', 'Unchanged']].forEach(function (f, i) {
+  var n = f[0] === 'all' ? rows.length : rows.filter(function (r) { return r.k === f[0]; }).length;
+  if (!n) return;
+  var b = el('button', null, f[1] + ' · ' + n); b.type = 'button'; b.setAttribute('aria-pressed', String(i === 0));
+  b.addEventListener('click', function () {
+    $('filters').querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    rows.forEach(function (r) { r.tr.hidden = f[0] !== 'all' && r.k !== f[0]; });
+  });
+  $('filters').appendChild(b);
 });
 </script>
