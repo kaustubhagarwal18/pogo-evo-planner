@@ -1,0 +1,14 @@
+__pycache__/
+*.egg-info/
+.venv/
+build/
+dist/
+.ruff_cache/
+.pytest_cache/
+
+# local data and captures (may contain personal info)
+data/latest.json
+data/*.tmp
+mock/
+captures/
+inventory.json

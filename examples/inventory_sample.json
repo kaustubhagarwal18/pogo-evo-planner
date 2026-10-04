@@ -1,0 +1,50 @@
+{
+  "rare_candy": 150,
+  "candy": {
+    "DRATINI": 60,
+    "LARVITAR": 90,
+    "BELDUM": 40,
+    "FEEBAS": 30,
+    "MAGIKARP": 350,
+    "EEVEE": 80,
+    "GASTLY": 110,
+    "MACHOP": 70,
+    "PIDGEY": 140,
+    "GIBLE": 20,
+    "NOIBAT": 230,
+    "CHANSEY": 70,
+    "ONIX": 60,
+    "SCYTHER": 55,
+    "RALTS": 120
+  },
+  "items": {
+    "ITEM_METAL_COAT": 1,
+    "ITEM_SINNOH_STONE": 1
+  },
+  "pokedex": [
+    "DRATINI", "DRAGONAIR", "LARVITAR", "PUPITAR", "BELDUM", "FEEBAS", "MAGIKARP",
+    "EEVEE", "VAPOREON", "JOLTEON", "GASTLY", "HAUNTER", "MACHOP", "MACHOKE",
+    "PIDGEY", "PIDGEOTTO", "PIDGEOT", "GIBLE", "NOIBAT", "CHANSEY", "ONIX",
+    "SCYTHER", "RALTS", "KIRLIA", "GARDEVOIR"
+  ],
+  "pokemon": [
+    {"species": "Dratini", "iv": [15, 14, 13]},
+    {"species": "Dragonair", "iv": [12, 15, 15]},
+    {"species": "Pupitar", "iv": [14, 14, 15]},
+    {"species": "Beldum", "iv": [15, 15, 14]},
+    {"species": "Feebas", "iv": [13, 15, 12]},
+    {"species": "Magikarp", "iv": [15, 15, 15]},
+    {"species": "Eevee", "iv": [14, 13, 15]},
+    {"species": "Eevee", "iv": [10, 12, 9]},
+    {"species": "Haunter", "iv": [15, 12, 14]},
+    {"species": "Machoke", "iv": [13, 13, 13]},
+    {"species": "Pidgey"},
+    {"species": "Gible", "iv": [15, 13, 15]},
+    {"species": "Noibat", "iv": [12, 14, 13]},
+    {"species": "Chansey", "iv": [15, 15, 13]},
+    {"species": "Onix", "iv": [11, 15, 14]},
+    {"species": "Scyther", "iv": [15, 14, 14]},
+    {"species": "Kirlia", "iv": [14, 15, 15]},
+    {"species": "Snorlax", "iv": [15, 15, 15]}
+  ]
+}

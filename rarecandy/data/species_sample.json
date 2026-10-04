@@ -1,0 +1,817 @@
+{
+ "_comment": "Hand-entered approximation for testing only. Verify against the live game master before relying on it.",
+ "DRATINI": {
+  "family": "DRATINI",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "DRAGONAIR",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 147
+ },
+ "DRAGONAIR": {
+  "family": "DRATINI",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "DRAGONITE",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 148
+ },
+ "DRAGONITE": {
+  "family": "DRATINI",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 149
+ },
+ "LARVITAR": {
+  "family": "LARVITAR",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "PUPITAR",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 246
+ },
+ "PUPITAR": {
+  "family": "LARVITAR",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "TYRANITAR",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 247
+ },
+ "TYRANITAR": {
+  "family": "LARVITAR",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 248
+ },
+ "BELDUM": {
+  "family": "BELDUM",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "METANG",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 374
+ },
+ "METANG": {
+  "family": "BELDUM",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "METAGROSS",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 375
+ },
+ "METAGROSS": {
+  "family": "BELDUM",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 376
+ },
+ "GIBLE": {
+  "family": "GIBLE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GABITE",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 443
+ },
+ "GABITE": {
+  "family": "GIBLE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GARCHOMP",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 444
+ },
+ "GARCHOMP": {
+  "family": "GIBLE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 445
+ },
+ "BAGON": {
+  "family": "BAGON",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "SHELGON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 371
+ },
+ "SHELGON": {
+  "family": "BAGON",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "SALAMENCE",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 372
+ },
+ "SALAMENCE": {
+  "family": "BAGON",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 373
+ },
+ "DEINO": {
+  "family": "DEINO",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "ZWEILOUS",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 633
+ },
+ "ZWEILOUS": {
+  "family": "DEINO",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "HYDREIGON",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 634
+ },
+ "HYDREIGON": {
+  "family": "DEINO",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 635
+ },
+ "SLAKOTH": {
+  "family": "SLAKOTH",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "VIGOROTH",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 287
+ },
+ "VIGOROTH": {
+  "family": "SLAKOTH",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "SLAKING",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 288
+ },
+ "SLAKING": {
+  "family": "SLAKOTH",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 289
+ },
+ "BULBASAUR": {
+  "family": "BULBASAUR",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "IVYSAUR",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 1
+ },
+ "IVYSAUR": {
+  "family": "BULBASAUR",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "VENUSAUR",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 2
+ },
+ "VENUSAUR": {
+  "family": "BULBASAUR",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 3
+ },
+ "GASTLY": {
+  "family": "GASTLY",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "HAUNTER",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 92
+ },
+ "HAUNTER": {
+  "family": "GASTLY",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GENGAR",
+    "candy": 100,
+    "item": null,
+    "trade_free": true,
+    "notes": []
+   }
+  ],
+  "dex": 93
+ },
+ "GENGAR": {
+  "family": "GASTLY",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 94
+ },
+ "MACHOP": {
+  "family": "MACHOP",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "MACHOKE",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 66
+ },
+ "MACHOKE": {
+  "family": "MACHOP",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "MACHAMP",
+    "candy": 100,
+    "item": null,
+    "trade_free": true,
+    "notes": []
+   }
+  ],
+  "dex": 67
+ },
+ "MACHAMP": {
+  "family": "MACHOP",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 68
+ },
+ "GEODUDE": {
+  "family": "GEODUDE",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GRAVELER",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 74
+ },
+ "GRAVELER": {
+  "family": "GEODUDE",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GOLEM",
+    "candy": 100,
+    "item": null,
+    "trade_free": true,
+    "notes": []
+   }
+  ],
+  "dex": 75
+ },
+ "GOLEM": {
+  "family": "GEODUDE",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 76
+ },
+ "PIDGEY": {
+  "family": "PIDGEY",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "PIDGEOTTO",
+    "candy": 12,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 16
+ },
+ "PIDGEOTTO": {
+  "family": "PIDGEY",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "PIDGEOT",
+    "candy": 50,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 17
+ },
+ "PIDGEOT": {
+  "family": "PIDGEY",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 18
+ },
+ "MAGIKARP": {
+  "family": "MAGIKARP",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GYARADOS",
+    "candy": 400,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 129
+ },
+ "GYARADOS": {
+  "family": "MAGIKARP",
+  "buddy_km": 1,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 130
+ },
+ "FEEBAS": {
+  "family": "FEEBAS",
+  "buddy_km": 20,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "MILOTIC",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": [
+     "walk 20 km as buddy first"
+    ]
+   }
+  ],
+  "dex": 349
+ },
+ "MILOTIC": {
+  "family": "FEEBAS",
+  "buddy_km": 20,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 350
+ },
+ "NOIBAT": {
+  "family": "NOIBAT",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "NOIVERN",
+    "candy": 400,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 714
+ },
+ "NOIVERN": {
+  "family": "NOIBAT",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 715
+ },
+ "CHANSEY": {
+  "family": "CHANSEY",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "BLISSEY",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 113
+ },
+ "BLISSEY": {
+  "family": "CHANSEY",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 242
+ },
+ "ONIX": {
+  "family": "ONIX",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "STEELIX",
+    "candy": 50,
+    "item": "ITEM_METAL_COAT",
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 95
+ },
+ "STEELIX": {
+  "family": "ONIX",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 208
+ },
+ "SCYTHER": {
+  "family": "SCYTHER",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "SCIZOR",
+    "candy": 50,
+    "item": "ITEM_METAL_COAT",
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 123
+ },
+ "SCIZOR": {
+  "family": "SCYTHER",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 212
+ },
+ "RALTS": {
+  "family": "RALTS",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "KIRLIA",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 280
+ },
+ "KIRLIA": {
+  "family": "RALTS",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "GARDEVOIR",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   },
+   {
+    "to": "GALLADE",
+    "candy": 100,
+    "item": "ITEM_SINNOH_STONE",
+    "trade_free": false,
+    "notes": [
+     "gender: MALE"
+    ]
+   }
+  ],
+  "dex": 281
+ },
+ "GARDEVOIR": {
+  "family": "RALTS",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 282
+ },
+ "GALLADE": {
+  "family": "RALTS",
+  "buddy_km": 3,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 475
+ },
+ "EEVEE": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [
+   {
+    "to": "VAPOREON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   },
+   {
+    "to": "JOLTEON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   },
+   {
+    "to": "FLAREON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   },
+   {
+    "to": "ESPEON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": [
+     "walk 10 km as buddy first",
+     "evolve during the day"
+    ]
+   },
+   {
+    "to": "UMBREON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": [
+     "walk 10 km as buddy first",
+     "evolve at night"
+    ]
+   },
+   {
+    "to": "LEAFEON",
+    "candy": 25,
+    "item": "ITEM_TROY_DISK_MOSSY",
+    "trade_free": false,
+    "notes": []
+   },
+   {
+    "to": "GLACEON",
+    "candy": 25,
+    "item": "ITEM_TROY_DISK_GLACIAL",
+    "trade_free": false,
+    "notes": []
+   },
+   {
+    "to": "SYLVEON",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": [
+     "needs buddy affection"
+    ]
+   }
+  ],
+  "dex": 133
+ },
+ "VAPOREON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 134
+ },
+ "JOLTEON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 135
+ },
+ "FLAREON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 136
+ },
+ "ESPEON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 196
+ },
+ "UMBREON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 197
+ },
+ "LEAFEON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 470
+ },
+ "GLACEON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 471
+ },
+ "SYLVEON": {
+  "family": "EEVEE",
+  "buddy_km": 5,
+  "rarity": "standard",
+  "evolutions": [],
+  "dex": 700
+ },
+ "COSMOG": {
+  "family": "COSMOG",
+  "buddy_km": 20,
+  "rarity": "legendary",
+  "evolutions": [
+   {
+    "to": "COSMOEM",
+    "candy": 25,
+    "item": null,
+    "trade_free": false,
+    "notes": []
+   }
+  ],
+  "dex": 789
+ },
+ "COSMOEM": {
+  "family": "COSMOG",
+  "buddy_km": 20,
+  "rarity": "legendary",
+  "evolutions": [
+   {
+    "to": "SOLGALEO",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": [
+     "evolve during the day"
+    ]
+   },
+   {
+    "to": "LUNALA",
+    "candy": 100,
+    "item": null,
+    "trade_free": false,
+    "notes": [
+     "evolve at night"
+    ]
+   }
+  ],
+  "dex": 790
+ },
+ "SOLGALEO": {
+  "family": "COSMOG",
+  "buddy_km": 20,
+  "rarity": "legendary",
+  "evolutions": [],
+  "dex": 791
+ },
+ "LUNALA": {
+  "family": "COSMOG",
+  "buddy_km": 20,
+  "rarity": "legendary",
+  "evolutions": [],
+  "dex": 792
+ }
+}

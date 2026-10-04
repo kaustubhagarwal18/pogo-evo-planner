@@ -1,0 +1,32 @@
+{
+  "_comment": "Spawn rarity is not in the game master. Families are mapped to tiers by hand; edit freely. Legendary/mythical families default to the 'legendary' tier, everything else unlisted to 'common'.",
+  "multipliers": {
+    "common": 1.0,
+    "uncommon": 1.5,
+    "rare": 3.0,
+    "very_rare": 5.0,
+    "legendary": 10.0
+  },
+  "families": {
+    "PIDGEY": "common",
+    "MAGIKARP": "common",
+    "GEODUDE": "common",
+    "GASTLY": "uncommon",
+    "MACHOP": "uncommon",
+    "EEVEE": "uncommon",
+    "BULBASAUR": "uncommon",
+    "ONIX": "uncommon",
+    "RALTS": "rare",
+    "SCYTHER": "rare",
+    "NOIBAT": "rare",
+    "DRATINI": "rare",
+    "LARVITAR": "rare",
+    "GIBLE": "rare",
+    "BAGON": "rare",
+    "SLAKOTH": "rare",
+    "CHANSEY": "rare",
+    "FEEBAS": "rare",
+    "BELDUM": "very_rare",
+    "DEINO": "very_rare"
+  }
+}
