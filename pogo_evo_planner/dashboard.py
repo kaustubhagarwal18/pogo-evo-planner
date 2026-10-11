@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from .inventory import Inventory
 from .planner import Plan, families_missing_candy, owned_species
@@ -14,12 +15,13 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
     """Flatten a plan and its inventory into the JSON the dashboard template renders."""
     planned: dict[tuple[str, str], str] = {}
     registered = (inv.pokedex | owned_species(inv, species)) - inv.not_caught
-    families = []
+    families: list[dict[str, Any]] = []
     for f in p.families:
         paths = []
         for path in f.paths:
             if path.steps:
-                planned[(path.specimen.species, path.specimen.label)] = "Evolve to " + path.steps[-1].to.replace("_", " ").title()
+                planned[(path.specimen.species, path.specimen.label)] = \
+                    "Evolve to " + path.steps[-1].to.replace("_", " ").title()
             paths.append({
                 "species": path.specimen.species, "label": path.specimen.label, "candy": path.candy,
                 "steps": [{"frm": s.frm, "to": s.to, "candy": s.candy, "item": s.item, "notes": list(s.notes),
@@ -33,7 +35,8 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
     trade = []
     for spec, step in p.trade_instead:
         planned.setdefault((spec.species, spec.label), "Trade for " + step.to.replace("_", " ").title())
-        trade.append({"species": spec.species, "label": spec.label, "frm": step.frm, "to": step.to, "candy": step.candy})
+        trade.append({"species": spec.species, "label": spec.label, "frm": step.frm, "to": step.to,
+                      "candy": step.candy})
 
     def status(sp) -> str:
         """Describe what the plan does with one owned Pokémon."""

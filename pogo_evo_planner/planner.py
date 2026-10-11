@@ -201,7 +201,8 @@ def end_stages(sp: str, species: dict) -> set[str]:
     return set().union(*(end_stages(e["to"], species) for e in evos)) if evos else {sp}
 
 
-def keep_specimens(specs: list[Specimen], species: dict, owned: set[str] = frozenset()) -> list[Specimen]:
+def keep_specimens(specs: list[Specimen], species: dict,
+                   owned: set[str] | frozenset[str] = frozenset()) -> list[Specimen]:
     """The specimens worth planning for, in input order: the first of each species, and for a species
     whose line branches (Eevee, Kirlia) one per final evolution not owned yet, so each copy can take a
     different branch.

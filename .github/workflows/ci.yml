@@ -6,6 +6,46 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e '.[ocr,dev]'   # ocr extras so mypy and pylint see RapidOCR and RapidFuzz
+      - name: Ruff
+        run: ruff check pogo_evo_planner tests
+      - name: Pylint
+        run: |
+          pylint pogo_evo_planner
+          pylint tests --disable=missing-function-docstring
+      - name: Mypy
+        run: mypy pogo_evo_planner
+      - name: Bandit (security)
+        run: bandit -q -r pogo_evo_planner
+      - name: Codespell
+        run: codespell pogo_evo_planner tests docs scripts README.md Makefile .github
+
+  secrets:
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # scan every commit, not just the latest
+      - name: Install gitleaks
+        run: |
+          f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$f" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$f"
+          echo "${GITLEAKS_SHA256}  $f" | sha256sum -c -
+          tar -xzf "$f" gitleaks
+      - name: Scan git history for secrets
+        run: ./gitleaks git --redact --verbose .
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -20,8 +60,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr fonts-dejavu-core
       - name: Install
         run: pip install -e '.[dev]'
-      - name: Lint
-        run: ruff check pogo_evo_planner tests
       - name: Test (Tesseract backend)
         run: python -m unittest discover -s tests -t . -v
 

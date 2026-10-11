@@ -49,7 +49,7 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
     for r in results:
         for fam, n in r.candy.items():
             candy_votes[fam][n] += 1
-        frame_no_cp = Counter()
+        frame_no_cp: Counter[str] = Counter()
         for sp, cp in r.specimens:
             if cp is None:
                 frame_no_cp[sp] += 1

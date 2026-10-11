@@ -27,7 +27,8 @@ TIERS = json.loads((ROOT / "pogo_evo_planner/data/rarity_tiers.json").read_text(
 
 def brute_force(inv: Inventory, settings: Settings) -> float:
     """Try every combination of paths for the specimens the planner keeps (duplicates dropped)."""
-    per_spec = [enumerate_paths(s, SPECIES, settings, []) for s in keep_specimens(inv.pokemon, SPECIES, owned_species(inv, SPECIES))]
+    kept = keep_specimens(inv.pokemon, SPECIES, owned_species(inv, SPECIES))
+    per_spec = [enumerate_paths(s, SPECIES, settings, []) for s in kept]
     owned = with_earlier_stages({s.species for s in inv.pokemon}, SPECIES)
     from_base = candy_from_base(SPECIES)
     best = 0.0
@@ -182,7 +183,8 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(with_earlier_stages({"DRAGONITE"}, SPECIES), {"DRATINI", "DRAGONAIR", "DRAGONITE"})
 
     def test_duplicates_dropped_so_a_later_middle_stage_is_kept(self):
-        # seven Dratini listed before the only Dragonair: Dragonair -> Dragonite (100) fits, Dratini's route (125) doesn't
+        # seven Dratini listed before the only Dragonair:
+        # Dragonair -> Dragonite (100 candy) fits, Dratini's route (125) doesn't
         inv = Inventory(0, {"DRATINI": 100}, {}, set(),
                         [Specimen("DRATINI", label=f"#{i}") for i in range(7)] +
                         [Specimen("DRAGONAIR", label="a"), Specimen("DRAGONAIR", label="b")])

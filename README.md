@@ -202,10 +202,14 @@ some CP values and the storage grid sometimes pairs a name with a neighbouring c
 ```bash
 make test        # all tests incl. end-to-end OCR (~30 s)
 make test-fast   # skips the OCR end-to-end test
-make lint
+make lint        # ruff, pylint, mypy, bandit, codespell, and gitleaks if installed
 ```
 
-CI (`.github/workflows/ci.yml`) runs the suite with the Tesseract backend on Python
-3.10–3.13, plus a non-blocking RapidOCR job.
+Linter settings live in `pyproject.toml`. CI (`.github/workflows/ci.yml`) runs four jobs:
+
+- `lint`: ruff, pylint, mypy, bandit (security) and codespell.
+- `secrets`: gitleaks over the full git history.
+- `test`: the suite with the Tesseract backend on Python 3.10, 3.12 and 3.13.
+- `test-rapidocr`: the suite with RapidOCR (non-blocking).
 
 Not affiliated with Niantic, Scopely, Nintendo or The Pokémon Company.

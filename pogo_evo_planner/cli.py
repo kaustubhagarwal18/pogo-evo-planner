@@ -50,7 +50,8 @@ def render(p: Plan) -> str:
                 chain = " -> ".join([_title(path.steps[0].frm)] + [_title(s.to) for s in path.steps])
                 out.append(f"   {chain}")
                 for s in path.steps:
-                    extras = ([f"needs {s.item.removeprefix('ITEM_').replace('_', ' ').title()}"] if s.item else []) + list(s.notes)
+                    item = [f"needs {s.item.removeprefix('ITEM_').replace('_', ' ').title()}"] if s.item else []
+                    extras = item + list(s.notes)
                     if extras:
                         out.append(f"      {_title(s.to)}: {'; '.join(extras)}")
         out.append("")
