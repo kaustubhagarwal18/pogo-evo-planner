@@ -22,8 +22,9 @@ Model
 
 Optimisation
 ------------
-1. Per family: enumerate evolution paths for each owned specimen (including
-   multi-step paths and branches) and run a small DP over specimens. The
+1. Per family: keep the first specimen of each species (one per unowned final
+   evolution when the line branches, like Eevee), enumerate their evolution paths
+   (including multi-step paths and branches) and run a small DP over them. The
    result is the family's options: (candy needed, items used, value).
 2. Across families: a grouped knapsack picks one option per family so that
    total rare candy <= what you hold and shared items (Metal Coat, Sinnoh
@@ -99,7 +100,6 @@ class Settings:
     dex_bonus: float = 20.0          # km-equivalent value of a new Pokédex entry
     repeat_value: float = 0.0        # share of value kept by an evolution into a species you already own
     allow_trade_evolutions: bool = False  # spend candy on evolutions that are free via trade
-    max_specimens_per_family: int = 6
     rare_candy_blocked_families: frozenset = frozenset()
 
 
@@ -195,6 +195,27 @@ def families_missing_candy(inv: Inventory, species: dict) -> list[str]:
                    and reaches_new(s.species)})
 
 
+def end_stages(sp: str, species: dict) -> set[str]:
+    """Final evolutions reachable from a species: {GARDEVOIR, GALLADE} for Kirlia, {sp} when it doesn't evolve."""
+    evos = species.get(sp, {}).get("evolutions", [])
+    return set().union(*(end_stages(e["to"], species) for e in evos)) if evos else {sp}
+
+
+def keep_specimens(specs: list[Specimen], species: dict,
+                   owned: set[str] | frozenset[str] = frozenset()) -> list[Specimen]:
+    """The specimens worth planning for, in input order: the first of each species, and for a species
+    whose line branches (Eevee, Kirlia) one per final evolution not owned yet, so each copy can take a
+    different branch.
+    """
+    kept: dict[str, list[Specimen]] = {}
+    for s in specs:
+        copies = kept.setdefault(s.species, [])
+        if len(copies) < max(1, len(end_stages(s.species, species) - owned)):
+            copies.append(s)
+    keep = {id(s) for copies in kept.values() for s in copies}  # by identity: two "CP ?" Eevees are equal
+    return [s for s in specs if id(s) in keep]
+
+
 def enumerate_paths(spec: Specimen, species: dict, settings: Settings,
                     trade_out: list) -> list[Path]:
     """All evolution paths from a specimen, including doing nothing."""
@@ -273,10 +294,10 @@ def plan(species: dict, tiers: dict, inv: Inventory, settings: Settings | None =
             by_family.setdefault(species[s.species]["family"], []).append(s)
 
     from_base = candy_from_base(species)
+    have = owned_species(inv, species)
     family_data = {}
     for fam, specs in by_family.items():
-        # best specimens first (IV, then input order); cap to keep the DP small
-        specs = sorted(specs, key=lambda s: -(s.iv_pct or 0))[: settings.max_specimens_per_family]
+        specs = keep_specimens(specs, species, have)
         km, cpc = cost_per_candy(fam, species, tiers)
         owned = inv.candy.get(fam, 0)
         opts = family_options(fam, specs, species, inv, cpc, settings, trade_out, from_base)

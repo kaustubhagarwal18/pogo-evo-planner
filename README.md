@@ -80,13 +80,13 @@ Rare candy: using 150 of 150  (value score 13,392)
 
 == Spend rare candy on ==
 Feebas family: 100 candy (30 owned + 70 rare) - saves ~1,400 km of buddy walking
-   Feebas -> Milotic  [#5 88.9%]
+   Feebas -> Milotic
       Milotic: walk 20 km as buddy first
 Dratini family: 100 candy (60 owned + 40 rare) - saves ~200 km of buddy walking
-   Dragonair -> Dragonite  [#2 93.3%]
+   Dragonair -> Dragonite
 ...
 == Trade instead of spending candy ==
-   Haunter -> Gengar is free when traded (from Haunter #9)
+   Haunter -> Gengar is free when traded
 ```
 
 ## Example dashboard (a real recording)
@@ -173,9 +173,9 @@ What each screen provides:
 
 Renders the same plan as one self-contained HTML file from `pogo_evo_planner/data/dashboard.html`:
 the species the plan evolves into, summary, families ranked by value, the Rare Candy budget,
-evolution order (with a "New" tag where an evolution adds a Pokédex entry), trades, skipped
-Pokémon, and the scanned inventory, filterable by what the plan does to each. It flags families
-whose candy count wasn't scanned. Pokémon sprites and artwork load from
+evolution order (with a "New" tag where an evolution adds a Pokédex entry), skipped Pokémon,
+and the scanned inventory, filterable by what the plan does to each. It flags families whose
+candy count wasn't scanned. Pokémon sprites and artwork load from
 [PokeAPI's sprite repository](https://github.com/PokeAPI/sprites) by national dex number when
 online; offline, each shows its initial instead. The file lists your Pokémon, so it is gitignored
 like `inventory.json`.
@@ -202,10 +202,14 @@ some CP values and the storage grid sometimes pairs a name with a neighbouring c
 ```bash
 make test        # all tests incl. end-to-end OCR (~30 s)
 make test-fast   # skips the OCR end-to-end test
-make lint
+make lint        # ruff, pylint, mypy, bandit, codespell, and gitleaks if installed
 ```
 
-CI (`.github/workflows/ci.yml`) runs the suite with the Tesseract backend on Python
-3.10–3.13, plus a non-blocking RapidOCR job.
+Linter settings live in `pyproject.toml`. CI (`.github/workflows/ci.yml`) runs four jobs:
+
+- `lint`: ruff, pylint, mypy, bandit (security) and codespell.
+- `secrets`: gitleaks over the full git history.
+- `test`: the suite with the Tesseract backend on Python 3.10, 3.12 and 3.13.
+- `test-rapidocr`: the suite with RapidOCR (non-blocking).
 
 Not affiliated with Niantic, Scopely, Nintendo or The Pokémon Company.

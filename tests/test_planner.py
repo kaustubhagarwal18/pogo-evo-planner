@@ -13,6 +13,8 @@ from pogo_evo_planner.planner import (
     cost_per_candy,
     enumerate_paths,
     families_missing_candy,
+    keep_specimens,
+    owned_species,
     plan,
     with_earlier_stages,
     with_forms,
@@ -24,8 +26,9 @@ TIERS = json.loads((ROOT / "pogo_evo_planner/data/rarity_tiers.json").read_text(
 
 
 def brute_force(inv: Inventory, settings: Settings) -> float:
-    """Try every combination of paths for every specimen."""
-    per_spec = [enumerate_paths(s, SPECIES, settings, []) for s in inv.pokemon]
+    """Try every combination of paths for the specimens the planner keeps (duplicates dropped)."""
+    kept = keep_specimens(inv.pokemon, SPECIES, owned_species(inv, SPECIES))
+    per_spec = [enumerate_paths(s, SPECIES, settings, []) for s in kept]
     owned = with_earlier_stages({s.species for s in inv.pokemon}, SPECIES)
     from_base = candy_from_base(SPECIES)
     best = 0.0
@@ -178,6 +181,28 @@ class PlannerTests(unittest.TestCase):
         p = plan(SPECIES, TIERS, inv)
         self.assertEqual(p.families, [])
         self.assertEqual(with_earlier_stages({"DRAGONITE"}, SPECIES), {"DRATINI", "DRAGONAIR", "DRAGONITE"})
+
+    def test_duplicates_dropped_so_a_later_middle_stage_is_kept(self):
+        # seven Dratini listed before the only Dragonair:
+        # Dragonair -> Dragonite (100 candy) fits, Dratini's route (125) doesn't
+        inv = Inventory(0, {"DRATINI": 100}, {}, set(),
+                        [Specimen("DRATINI", label=f"#{i}") for i in range(7)] +
+                        [Specimen("DRAGONAIR", label="a"), Specimen("DRAGONAIR", label="b")])
+        paths = [path for f in plan(SPECIES, TIERS, inv).families for path in f.paths]
+        self.assertEqual([(p.specimen.label, p.targets) for p in paths], [("a", ["DRAGONITE"])])
+
+    def test_branching_species_keep_one_copy_per_branch(self):
+        mons = [Specimen(s, label=f"#{i}") for i, s in enumerate(["EEVEE"] * 10 + ["KIRLIA"] * 3 + ["DRATINI"] * 3)]
+        kept = Counter(s.species for s in keep_specimens(mons, SPECIES))
+        self.assertEqual(kept, {"EEVEE": 8, "KIRLIA": 2, "DRATINI": 1})
+        # branches you already own don't need a copy
+        kept = Counter(s.species for s in keep_specimens(mons, SPECIES, {"VAPOREON", "JOLTEON", "GALLADE"}))
+        self.assertEqual(kept, {"EEVEE": 6, "KIRLIA": 1, "DRATINI": 1})
+        # two Kirlia can become Gardevoir and Gallade
+        inv = Inventory(0, {"RALTS": 200}, {"ITEM_SINNOH_STONE": 1}, set(),
+                        [Specimen("KIRLIA", label="a"), Specimen("KIRLIA", label="b"), Specimen("KIRLIA", label="c")])
+        targets = sorted(path.targets[-1] for f in plan(SPECIES, TIERS, inv).families for path in f.paths)
+        self.assertEqual(targets, ["GALLADE", "GARDEVOIR"])
 
     def test_partial_top_up_is_not_spent(self):
         inv = Inventory(10, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI")])

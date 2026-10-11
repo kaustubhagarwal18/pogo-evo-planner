@@ -16,7 +16,8 @@ dependencies = []  # the planner is pure stdlib
 scan = ["opencv-python-headless>=4.8", "numpy>=1.24"]
 # recommended OCR + fuzzy matching (without these, Tesseract and difflib are used)
 ocr = ["pogo-evo-planner[scan]", "rapidocr>=2", "onnxruntime>=1.16", "rapidfuzz>=3"]
-dev = ["pogo-evo-planner[scan]", "pillow>=10", "pytest>=8", "ruff>=0.5"]
+dev = ["pogo-evo-planner[scan]", "pillow>=10", "pytest>=8", "ruff>=0.5",
+       "pylint>=4", "mypy>=2", "bandit>=1.8", "codespell>=2.3"]
 
 [project.scripts]
 pogo-evo-planner = "pogo_evo_planner.cli:main"
@@ -33,3 +34,31 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.pylint.main]
+py-version = "3.10"
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.typecheck]
+generated-members = ["cv2.*"]  # OpenCV is a compiled module pylint can't inspect
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",    # mostly dataclasses
+    "import-outside-toplevel",    # optional dependencies and faster CLI start-up are imported lazily
+    "too-many-arguments", "too-many-positional-arguments", "too-many-locals",
+    "too-many-branches", "too-many-instance-attributes", "too-few-public-methods",
+]
+
+[tool.mypy]
+python_version = "3.10"
+
+[[tool.mypy.overrides]]
+module = ["rapidocr_onnxruntime"]  # older RapidOCR package name, only imported as a fallback
+ignore_missing_imports = true
+
+[tool.codespell]
+ignore-words-list = "gastly"

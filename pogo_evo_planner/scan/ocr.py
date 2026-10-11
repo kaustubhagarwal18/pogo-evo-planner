@@ -16,7 +16,7 @@ import csv
 import io
 import os
 import shutil
-import subprocess
+import subprocess  # only runs the tesseract CLI on our own temp file  # nosec B404
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -58,7 +58,7 @@ def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
     """One Tesseract pass over an image, with boxes scaled back to original pixels."""
     with tempfile.NamedTemporaryFile(suffix=".png") as f:
         cv2.imwrite(f.name, img)
-        out = subprocess.run(
+        out = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
             ["tesseract", f.name, "stdout", "--psm", str(psm), "-l", "eng", "tsv"],
             capture_output=True, text=True, check=True,
             env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
@@ -116,7 +116,7 @@ def rapidocr_available() -> bool:
     try:
         _rapidocr_engine()
         return True
-    except Exception:  # noqa: BLE001 - import or ONNX model init can fail many ways; fall back
+    except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught  # import or ONNX init can fail many ways
         return False
 
 
@@ -140,7 +140,7 @@ def _rapidocr_words(img: np.ndarray) -> list[Word]:
     """OCR an image with RapidOCR and return word-level boxes."""
     out = _rapidocr_engine()(img)
     if isinstance(out, tuple):  # rapidocr_onnxruntime: (result, elapse); result = [[box, text, score], ...]
-        lines = [(b, t, s) for b, t, s in (out[0] or [])]
+        lines = [tuple(r) for r in (out[0] or [])]
     else:                      # rapidocr >= 2: object with boxes / txts / scores
         if out.boxes is None:
             return []

@@ -71,10 +71,11 @@ def load_pokemon_csv(path: str | Path) -> list[Specimen]:
     iv_cols = [next((headers[c] for c in opts if c in headers), None) for opts in _IV_COLS]
     out = []
     for i, row in enumerate(rows):
-        iv = None
+        iv: tuple[int, int, int] | None = None
         if all(iv_cols):
             try:
-                iv = tuple(int(row[c]) for c in iv_cols)
+                atk, dfn, sta = (int(row[c]) for c in iv_cols)
+                iv = (atk, dfn, sta)
             except ValueError:
                 iv = None
         out.append(Specimen(_norm(row[sp_col]), iv, f"#{i + 1}"))

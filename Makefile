@@ -15,8 +15,15 @@ test:               ## full suite incl. end-to-end OCR on synthetic screens (~30
 test-fast:          ## skip the slow OCR end-to-end test
 	SKIP_SLOW=1 python -m unittest discover -s tests -t .
 
-lint:
+lint:               ## ruff, pylint, mypy, bandit, codespell (+ gitleaks if installed)
 	ruff check pogo_evo_planner tests
+	pylint pogo_evo_planner
+	pylint tests --disable=missing-function-docstring
+	mypy pogo_evo_planner
+	bandit -q -r pogo_evo_planner
+	codespell pogo_evo_planner tests docs scripts README.md Makefile .github
+	@if command -v gitleaks >/dev/null; then gitleaks git --redact --no-banner .; \
+	 else echo "gitleaks not installed, skipping secret scan (brew install gitleaks)"; fi
 
 gamemaster:         ## download the latest datamined game master to data/latest.json
 	./scripts/fetch_gamemaster.sh

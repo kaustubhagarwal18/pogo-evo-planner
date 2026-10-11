@@ -25,7 +25,7 @@ try:  # RapidFuzz is faster and better; difflib is the stdlib fallback
     from rapidfuzz import fuzz as _rf_fuzz
     from rapidfuzz import process as _rf_process
 except ImportError:
-    _rf_fuzz = _rf_process = None
+    _rf_fuzz = _rf_process = None  # type: ignore[assignment]
 
 _NUM = re.compile(r"^[x×X*]?(\d{1,3}(?:[,.]\d{3})+|\d+)$")
 _CP_JOINED = re.compile(r"^CP(\d{2,5})$", re.IGNORECASE)
@@ -120,8 +120,8 @@ def _phrases(words: list[Word], max_len: int = 2):
 
 def _span(ws: list[Word]) -> tuple[float, float, float, float]:
     """Bounding box (x0, y0, x1, y1) around a run of words."""
-    x0 = min(w.x for w in ws); x1 = max(w.x + w.w for w in ws)
-    y0 = min(w.y for w in ws); y1 = max(w.y + w.h for w in ws)
+    x0, x1 = min(w.x for w in ws), max(w.x + w.w for w in ws)
+    y0, y1 = min(w.y for w in ws), max(w.y + w.h for w in ws)
     return x0, y0, x1, y1
 
 
@@ -137,7 +137,7 @@ def _number_above(words: list[Word], anchor: list[Word], max_gap: float = 6.0) -
         if abs(w.cx - cx) > max(x1 - x0, w.w) * 0.75:
             continue
         gap = y0 - (w.y + w.h)
-        if gap <= max_gap * h and (best is None or gap < best[0]):
+        if gap <= max_gap * h and (best is None or gap < best[0]):  # pylint: disable=unsubscriptable-object
             best = (gap, v)
     return best[1] if best else None
 
@@ -238,7 +238,7 @@ def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
     evolves = [w for w in words if norm(w.text) == "EVOLVE"]
     sp = _screen_species(words, m) if img is not None and len(evolves) == 1 else None
     evos = species.get(sp, {}).get("evolutions", []) if sp else []
-    if len(evos) == 1:
+    if len(evos) == 1 and img is not None:
         caught = evolve_sprite_caught(img, evolves[0])
         if caught is not None:
             (r.dex_caught if caught else r.dex_not_caught).add(evos[0]["to"])
@@ -274,9 +274,9 @@ def parse_storage(words: list[Word], m: SpeciesMatcher) -> ScreenResult:
             j = _CP_JOINED.match(norm(w.text))
             if j:
                 cps.append((w.cx, w.cy, w.w, int(j.group(1))))
-            elif norm(w.text) == "CP" and i + 1 < len(line) and parse_int(line[i + 1].text) is not None:
+            elif norm(w.text) == "CP" and i + 1 < len(line) and (cp := parse_int(line[i + 1].text)) is not None:
                 x0, _, x1, _ = _span([w, line[i + 1]])
-                cps.append(((x0 + x1) / 2, w.cy, x1 - x0, parse_int(line[i + 1].text)))
+                cps.append(((x0 + x1) / 2, w.cy, x1 - x0, cp))
     used: set[int] = set()
     for text, run in _phrases(words):
         sp = m.match(text)

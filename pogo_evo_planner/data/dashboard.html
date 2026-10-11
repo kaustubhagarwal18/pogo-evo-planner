@@ -127,9 +127,7 @@ h2 { font-size: 17px; }
 .path .foot { border-top: 1px dashed var(--line); padding-top: 8px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .notes { font-size: 12px; color: var(--ink-2); }
 
-/* trade, skipped */
-.trade { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
-.pill { font-size: 12px; font-weight: 500; color: var(--good); border: 1px solid currentColor; border-radius: 99px; padding: 0 10px; }
+/* skipped */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px 2px 2px; font-size: 13px; }
 .chip .lb { color: var(--ink-3); font-family: var(--mono); font-size: 11px; }
@@ -189,18 +187,11 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
     <div class="paths" id="paths"></div>
     <div id="free"></div>
   </section>
-  <div class="grid2">
-    <section class="panel">
-      <h2>Trade instead of spending candy</h2>
-      <p>Trading evolves these for free.</p>
-      <div id="trade"></div>
-    </section>
-    <section class="panel">
-      <h2>Not in the plan</h2>
-      <p>In the inventory but not evolved this round.</p>
-      <div id="skipped"></div>
-    </section>
-  </div>
+  <section class="panel">
+    <h2>Not in the plan</h2>
+    <p>In the inventory but not evolved this round.</p>
+    <div id="skipped"></div>
+  </section>
   <section class="panel">
     <h2>Scanned Pokémon</h2>
     <p id="inv-sub"></p>
@@ -293,8 +284,7 @@ if (DATA.missing_candy.length) {
 
 [['Rare Candy used', [DATA.used, ' / ' + DATA.available], 'check against the game', DATA.available ? DATA.used / DATA.available : 0],
  ['Plan value', [fmt(DATA.total_value)], 'km-equivalent of buddy walking'],
- ['Families to evolve', [String(spend.length + own.length)], spend.length + ' with Rare Candy, ' + own.length + ' with your own candy'],
- ['Free by trading', [String(DATA.trade.length)], 'evolutions to do by trade']
+ ['Families to evolve', [String(spend.length + own.length)], spend.length + ' with Rare Candy, ' + own.length + ' with your own candy']
 ].forEach(function (s) {
   var d = el('div', 'stat'); d.appendChild(el('div', 'k', s[0]));
   var v = el('div', 'v', s[1][0]); if (s[1][1]) v.appendChild(el('small', null, s[1][1])); d.appendChild(v);
@@ -361,7 +351,7 @@ function pathCards(list, into, startRank) {
     c.appendChild(head);
     var extras = [];
     f.paths.forEach(function (p) {
-      var e = el('div', 'evo'); e.appendChild(stage(p.species, p.label, false, false));
+      var e = el('div', 'evo'); e.appendChild(stage(p.species, null, false, false));
       p.steps.forEach(function (st) { arrow(e); e.appendChild(stage(st.to, null, true, st.new_dex)); });
       c.appendChild(e);
       p.steps.forEach(function (st) {
@@ -385,22 +375,11 @@ if (own.length) {
   var g = el('div', 'paths'); $('free').appendChild(g); pathCards(own, g, 0);
 }
 
-// trade
 function chip(sp, label) {
   var c = el('span', 'chip'); c.appendChild(sprite(sp, 26)); c.appendChild(el('span', null, title(sp)));
   if (label) c.appendChild(el('span', 'lb', label));
   return c;
 }
-if (!DATA.trade.length) $('trade').appendChild(el('p', 'empty', 'Nothing to trade.'));
-DATA.trade.forEach(function (t) {
-  var d = el('div', 'trade'); d.appendChild(el('span', 'pill', 'Free'));
-  d.appendChild(chip(t.species, t.label));
-  if (t.frm !== t.species) { arrow(d); d.appendChild(chip(t.frm)); }
-  arrow(d); d.appendChild(chip(t.to));
-  d.appendChild(el('span', 'foot', 'saves ' + fmt(t.candy) + ' candy'));
-  $('trade').appendChild(d);
-});
-
 // skipped
 var skipped = DATA.pokemon.filter(function (p) { return p.status === 'Not planned'; });
 if (skipped.length) {
