@@ -84,7 +84,8 @@ Pokémon's page per family, or use --candy NAME=N:
   Applin, Bellsprout, Blipbug (e.g. Dottler), Charcadet, Dreepy (e.g. Drakloak), ...
 ```
 
-Next it asks for those candy counts, one family at a time:
+Next it asks for those candy counts, one family at a time, then for the evolution items the
+missing species need (apples, Sinnoh Stone, lure modules…):
 
 ```
 18 families need a candy count. For each, type the number, or the path of a screenshot of that
@@ -93,12 +94,15 @@ Nacli candy (Naclstack → Garganacl needs 100): 72
 Dreepy candy (Drakloak → Dragapult needs 100): captures/drakloak.png
   read 92
 ...
+3 evolution items are needed. For each, type how many you have (Enter if none; q stops).
+Sweet Apple (Applin → Appletun): how many? 23
+...
 ```
 
 The candy count is shown on any Pokémon's page in that family. With the answers it prints the
-Rare Candy plan, saves the counts, and shows the `--candy` options that skip the questions next
-time (`--candy Naclstack=72` takes a Pokémon's name or its family's). `--no-ask` only lists
-what's missing. The plan looks like this:
+Rare Candy plan, saves the answers, and shows the `--candy` and `--item` options that skip the
+questions next time (`--candy Naclstack=72` takes a Pokémon's name or its family's;
+`--item "Tart Apple=26"`). `--no-ask` only lists what's missing. The plan looks like this:
 
 ```
 Rare Candy: 110 of 305 used
@@ -107,18 +111,30 @@ Evolve now with your own candy:
   Floette → Florges Red (needs an evolution quest)
 
 Use Rare Candy:
-  Larvesta → Volcarona  +102 Rare Candy
   Drakloak → Dragapult  +8 Rare Candy
+  Larvesta → Volcarona  +102 Rare Candy
 
 Not yet:
   Applin → Flapple: needs Tart Apple: if you have one, add --item "Tart Apple=N"
   Snom → Frosmoth: 298 candy short (have 102 of 400) (evolve at night; needs an evolution quest)
 ```
 
-Only evolutions into species you've never caught are planned, and Rare Candy is never spent
-on a family whose candy count is unknown. Detail pages count as Pokémon you own, one per CP, so
+"Use Rare Candy" lists the best use first: value per Rare Candy, so 8 Rare Candy that finish
+Dragapult come before 102 for Volcarona. "Evolve now" doesn't depend on Rare Candy: an evolution
+your own candy covers is listed however few Rare Candy you have. Only evolutions into species
+you've never caught are planned, one form per Pokédex entry, and Rare Candy is never spent on a
+family whose candy count is unknown. Detail pages count as Pokémon you own, one per CP, so
 include a page for each copy of a Pokémon with several evolutions (Applin, Eevee) you'd evolve.
-Add evolution items with `--item "Tart Apple=26"`. What was read is saved to `evolvenew.json`.
+What was read and answered is saved to `evolvenew.json`; `--dashboard plan.html` also writes the
+HTML dashboard.
+
+#### Known issue: Pokémon with several evolutions
+
+`evolvenew` lists a Pokémon when **at least one** of its evolutions is new, but the tool treats
+every branch as new. A Charcadet is listed because Ceruledge is new, so the plan also suggests
+Charcadet → Armarouge, although the player owns two Armarouge (an owned Armarouge isn't on the
+`evolvenew` list, so the tool can't see it). Check branching Pokémon (Charcadet, Kubfu, Applin,
+Eevee…) in the game before evolving; a detail-page screenshot shows each branch's silhouette.
 
 #### Known issue: nicknamed Pokémon
 
@@ -328,10 +344,10 @@ against real captures yet; the tests use fake clients.
 ### Dashboard (`pogo_evo_planner/dashboard.py`)
 
 Renders the same plan as one self-contained HTML file from `pogo_evo_planner/data/dashboard.html`:
-the species the plan evolves into, summary, families ranked by value, the Rare Candy budget,
-evolution order (with a "New" tag where an evolution adds a Pokédex entry), skipped Pokémon,
-and the scanned inventory, filterable by what the plan does to each. It flags families whose
-candy count wasn't scanned. Pokémon sprites and artwork load from
+the species the plan evolves into, summary, families ranked by value per Rare Candy (best use
+first), the Rare Candy budget, evolution order (with a "New" tag where an evolution adds a
+Pokédex entry), and the Pokémon left out of the plan (an extra copy of a species being evolved
+isn't listed). It flags families whose candy count wasn't scanned. Pokémon sprites and artwork load from
 [PokeAPI's sprite repository](https://github.com/PokeAPI/sprites) by national dex number when
 online; offline, each shows its initial instead. The file lists your Pokémon, so it is gitignored
 like `inventory.json`.

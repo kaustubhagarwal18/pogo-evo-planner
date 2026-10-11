@@ -125,8 +125,17 @@ def cmd_dashboard(a) -> None:
 def cmd_evolvenew(a) -> None:
     """Handle `pogo-evo-planner evolvenew`: read the detail pages of the Pokémon the game's `evolvenew`
     search lists, then print what to evolve and where Rare Candy goes."""
-    from .evolvenew import apply_evolvenew, ask_for_candy, candy_overrides, item_overrides, unknown_candy
+    from .evolvenew import (
+        apply_evolvenew,
+        ask_for_candy,
+        ask_for_items,
+        candy_overrides,
+        item_overrides,
+        items_needed,
+        unknown_candy,
+    )
     from .evolvenew import render as render_evolvenew
+    from .gamemaster import item_name
     from .scan.pipeline import scan
 
     species = load_species(a.species)
@@ -163,24 +172,27 @@ def cmd_evolvenew(a) -> None:
     print(f"Saved -> {a.output} (fix a misread count with --candy NAME=N)\n", file=sys.stderr)
     a.blocked = unknown_candy(load_inventory(a.output), species)   # never guess a count as 0 and fill it
     result, plan_inv = _make_plan(a, species, a.output)
-    if not a.blocked or a.no_ask or not sys.stdin.isatty():
+    if not (a.blocked or items_needed(plan_inv, species)) or a.no_ask or not sys.stdin.isatty():
         print(render_evolvenew(result, plan_inv, species, listing), end="")
     else:
-        # show what's missing, ask for the candy counts it needs, then plan with the answers
+        # show what's missing, ask for the candy counts and items it needs, then plan with the answers
         print(render_evolvenew(result, plan_inv, species, listing, show_plan=False))
 
         def read_candy(paths: list[str]) -> dict[str, int]:
             """Read candy counts from detail-page screenshots."""
             return scan(paths, species, backend=a.ocr, fps=a.fps)[0]["candy"]
 
-        answers = ask_for_candy(plan_inv, species, ask=input, read=read_candy, say=print)
-        if answers:
-            inv["candy"].update(answers)
+        candy_given = ask_for_candy(plan_inv, species, ask=input, read=read_candy, say=print) if a.blocked else {}
+        items_given = ask_for_items(plan_inv, species, ask=input, say=print)
+        if candy_given or items_given:
+            inv["candy"].update(candy_given)
+            inv["items"].update(items_given)
             Path(a.output).write_text(json.dumps(inv, indent=2) + "\n", encoding="utf-8")
             a.blocked = unknown_candy(load_inventory(a.output), species)
             result, plan_inv = _make_plan(a, species, a.output)
-            given = " ".join(f"--candy {f}={n}" for f, n in sorted(answers.items()))
-            print(f"\nSaved your counts to {a.output}. To skip the questions next time: {given}\n")
+            given = [f"--candy {f}={n}" for f, n in sorted(candy_given.items())] + \
+                    [f'--item "{item_name(i)}={n}"' for i, n in sorted(items_given.items())]
+            print(f"\nSaved your answers to {a.output}. To skip the questions next time: {' '.join(given)}\n")
         print(render_evolvenew(result, plan_inv, species, listing, show_missing=False), end="")
     if a.dashboard:
         _write_dashboard(a, species, a.output, a.dashboard, ", ".join(Path(f).name for f in a.files))

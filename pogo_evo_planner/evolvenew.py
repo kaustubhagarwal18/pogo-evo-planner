@@ -150,7 +150,8 @@ def _render_plan(p: Plan, inv: Inventory, species: dict) -> list[str]:
     """The Rare Candy plan: evolve now, use Rare Candy, not yet, and the candy counts still needed."""
     planned: set[str] = set()
     now, rare = [], []
-    for f in sorted(p.families, key=lambda f: -f.value):
+    # best use of Rare Candy first: value per Rare Candy; families on their own candy by value
+    for f in sorted(p.families, key=lambda f: -(f.value / f.rare_candy if f.rare_candy else f.value)):
         lines = []
         for path in f.paths:
             if not path.steps:
@@ -242,7 +243,9 @@ def ask_for_candy(inv: Inventory, species: dict, ask: Callable[[str], str],
             wanted.setdefault(fam, []).append(f"{_name(frm)} → {_name(to)} needs {cost}")
     if not wanted:
         return {}
-    say(f"{len(wanted)} families need a candy count. For each, type the number, or the path of a screenshot "
+    n = len(wanted)
+    say(f"{n} {'family needs' if n == 1 else 'families need'} a candy count. For each, type the number, or the "
+        "path of a screenshot "
         "of that Pokémon's page (you can drag the file in), or press Enter to skip; q stops.")
     answers: dict[str, int] = {}
     for fam, uses in wanted.items():
@@ -270,6 +273,44 @@ def ask_for_candy(inv: Inventory, species: dict, ask: Callable[[str], str],
                 say(f"  read {read_counts[fam]}")
                 break
             say(f"  no {_name(fam)} candy count on that screenshot; type the number instead, or another screenshot")
+    return answers
+
+
+def items_needed(inv: Inventory, species: dict) -> dict[str, list[str]]:
+    """Evolution items the missing species need and that haven't been given: {item id: [evolutions]}."""
+    wanted: dict[str, list[str]] = {}
+    for to, frm, _ in missing(inv, species)[0]:
+        item = _evolution(frm, to, species).get("item")
+        if item and item not in inv.items:
+            wanted.setdefault(item, []).append(f"{_name(frm)} → {_name(to)}")
+    return wanted
+
+
+def ask_for_items(inv: Inventory, species: dict, ask: Callable[[str], str],
+                  say: Callable[[str], None]) -> dict[str, int]:
+    """Ask how many of each needed evolution item (apples, Sinnoh Stone, lures...) the player has.
+
+    Enter means none; "q" or the end of input (Ctrl-D) stops asking. Returns {item id: count}.
+    """
+    wanted = items_needed(inv, species)
+    if not wanted:
+        return {}
+    n = len(wanted)
+    say(f"{n} evolution {'item is' if n == 1 else 'items are'} needed. For each, type how many you have "
+        "(Enter if none; q stops).")
+    answers: dict[str, int] = {}
+    for item, uses in wanted.items():
+        for _ in range(3):
+            try:
+                reply = ask(f"{item_name(item)} ({'; '.join(uses)}): how many? ").strip()
+            except EOFError:
+                return answers
+            if reply.lower() in ("q", "quit"):
+                return answers
+            if not reply or reply.isdigit():
+                answers[item] = int(reply or 0)
+                break
+            say("  type a number, or press Enter if you have none")
     return answers
 
 

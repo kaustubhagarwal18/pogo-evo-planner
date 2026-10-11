@@ -82,6 +82,10 @@ Next from that recording:
 - [x] The command asks for each missing candy count (a number, or a screenshot of that Pokémon's
       page), then plans; tried in a real terminal with 17 families. Forms of one Pokédex entry are
       planned once (one Dudunsparce, not both forms), and a family's Rare Candy is shown once
+- [ ] **Known bug: branching Pokémon.** `evolvenew` lists a Pokémon when at least one evolution is
+      new, but every branch is treated as new: Charcadet → Armarouge is planned although two
+      Armarouge are owned. Fix: trust a branch as new only when the "Seen" list or a detail-page
+      silhouette confirms it; otherwise mark it "check in game" or ask
 - [ ] **Known bug:** OCR reads the name under each grid cell, never the picture, and the grid
       shows nicknames, not species. A Victreebel listed for Mega Victreebel and nicknamed
       "99%Bellsprou…" is read as a Bellsprout, so Weepinbell is reported missing though it's owned.
@@ -116,6 +120,13 @@ Next from that recording:
 ## Phase 3: Better recommendations
 
 - [ ] Rarity from data rather than hand tiers (spawn/biome info, event boosts with expiry)
+- [ ] **Upcoming events:** an optional `--events` that fetches the event calendar (LeekDuck, which
+      the community project ScrapedDuck republishes as JSON; check it's still maintained first) and
+      marks families featured in the next few weeks (Community Day, Spotlight Hours, raid days).
+      For those, the plan says "wait for the event" and holds back Rare Candy, e.g. "Larvesta is
+      featured on <date>: catch and hatch then instead of spending 102 Rare Candy". Each event needs
+      its dates and an expiry, since schedules change late. Stays optional; the planner works
+      offline without it
 - [x] Collection-first value: only evolutions into a species you don't have count (owning a later
       stage covers earlier ones), the cheapest owned stage is evolved, and Rare Candy never pays
       for a repeat or gets spent just to use it up

@@ -38,10 +38,14 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
         trade.append({"species": spec.species, "label": spec.label, "frm": step.frm, "to": step.to,
                       "candy": step.candy})
 
+    evolving = {species for species, _ in planned}
+
     def status(sp) -> str:
         """Describe what the plan does with one owned Pokémon."""
         if (sp.species, sp.label) in planned:
             return planned[(sp.species, sp.label)]
+        if sp.species in evolving:
+            return "Another one is evolved"   # an extra copy, not something the plan left out
         if sp.species in inv.not_caught:
             return "Probably misread: an Evolve button shows it as never caught"
         if sp.species not in species:

@@ -11,6 +11,7 @@ from pogo_evo_planner import cli
 from pogo_evo_planner.evolvenew import (
     apply_evolvenew,
     ask_for_candy,
+    ask_for_items,
     candy_overrides,
     item_overrides,
     missing,
@@ -181,6 +182,19 @@ class EvolvenewTests(unittest.TestCase):
                                 read=lambda _: {"MAGIKARP": 12}, say=said.append)
         self.assertEqual(answers, {"DRATINI": 75})
         self.assertIn("no Dratini candy count on that screenshot", said[1])
+
+    def test_asks_for_the_evolution_items_needed(self):
+        # Kirlia -> Gallade needs a Sinnoh Stone, Onix -> Steelix a Metal Coat
+        data, _ = apply_evolvenew(scanned("KIRLIA", "ONIX", candy={"RALTS": 100, "ONIX": 50}), SPECIES)
+        inv = inventory_from_dict(data)
+        replies = iter(["two", "2", ""])
+        asked, said = [], []
+        answers = ask_for_items(inv, SPECIES, ask=lambda q: asked.append(q) or next(replies), say=said.append)
+        self.assertEqual(answers, {"ITEM_SINNOH_STONE": 2, "ITEM_METAL_COAT": 0})
+        self.assertEqual(asked[0], "Sinnoh Stone (Kirlia → Gallade): how many? ")
+        self.assertIn("type a number", said[1])          # "two" was asked again
+        inv.items.update(answers)
+        self.assertEqual(ask_for_items(inv, SPECIES, ask=lambda q: "", say=said.append), {})   # all known now
 
     def test_end_of_input_stops_asking(self):
         data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS"), SPECIES)
