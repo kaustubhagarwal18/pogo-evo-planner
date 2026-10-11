@@ -128,7 +128,11 @@ def cmd_scan(a) -> None:
         """Overwrite one stderr line with the frame being read."""
         print(f"\r  [{i}/{n}] {label}: {kind:<8}", end="", file=sys.stderr, flush=True)
 
-    inv, report = scan(a.files, species, backend=a.ocr, fps=a.fps, progress=None if a.quiet else progress)
+    try:
+        inv, report = scan(a.files, species, backend=a.ocr, fps=a.fps, progress=None if a.quiet else progress,
+                           max_llm_frames=a.llm_max_frames)
+    except ValueError as e:
+        sys.exit(f"error: {e}")
     if not a.quiet:
         print(file=sys.stderr)
     Path(a.output).write_text(json.dumps(inv, indent=2) + "\n", encoding="utf-8")
@@ -171,7 +175,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("scan", help="OCR screenshots / screen recordings into an inventory JSON")
     s.add_argument("files", nargs="+", help="screenshots (.png/.jpg) and/or recordings (.mp4/.mov)")
     s.add_argument("-o", "--output", default="inventory.json")
-    s.add_argument("--ocr", choices=["auto", "rapidocr", "tesseract"], default="auto")
+    s.add_argument("--ocr", choices=["auto", "rapidocr", "tesseract", "claude"], default="auto",
+                   help="text reader; 'claude' sends each frame to the Claude API (paid; needs the llm extras)")
+    s.add_argument("--llm-max-frames", type=int, default=60,
+                   help="with --ocr claude, refuse to send more frames than this (default 60)")
     s.add_argument("--fps", type=float, default=3.0, help="frames per second sampled from recordings")
     s.add_argument("--plan", action="store_true", help="run the planner on the result")
     s.add_argument("--dashboard", metavar="HTML", help="also write the plan as an HTML dashboard")

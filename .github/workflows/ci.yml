@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install -e '.[ocr,dev]'   # ocr extras so mypy and pylint see RapidOCR and RapidFuzz
+        run: pip install -e '.[ocr,llm,dev]'   # all extras, so mypy and pylint see every import
       - name: Ruff
         run: ruff check pogo_evo_planner tests
       - name: Pylint
@@ -59,7 +59,7 @@ jobs:
       - name: System OCR fallback
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr fonts-dejavu-core
       - name: Install
-        run: pip install -e '.[dev]'
+        run: pip install -e '.[llm,dev]'   # llm: the Claude backend's tests use a fake client, no API key
       - name: Test (Tesseract backend)
         run: python -m unittest discover -s tests -t . -v
 

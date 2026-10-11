@@ -88,20 +88,30 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
 
 
 def scan(paths: list[str | Path], species: dict, backend: str = "auto", fps: float = 3.0,
-         progress=None) -> tuple[dict, ScanReport]:
-    """OCR every screenshot and recording frame, parse each screen, and merge them into an inventory and report."""
+         progress=None, max_llm_frames: int = 60) -> tuple[dict, ScanReport]:
+    """OCR every screenshot and recording frame, parse each screen, and merge them into an inventory and report.
+
+    backend "claude" reads the screens with Claude instead of OCR (see scan/llm.py); it is paid per frame,
+    so more than max_llm_frames frames is refused rather than sent.
+    """
     matcher = SpeciesMatcher(species)
     report = ScanReport()
-    results = []
     frames = load_images(paths, fps=fps)
-    for i, (label, img) in enumerate(frames):
-        words = read_words(img, backend=backend)
-        res = parse(words, img, matcher, species)
-        report.frames_read += 1
-        report.screens[res.kind] += 1
-        results.append(res)
-        if progress:
-            progress(i + 1, len(frames), label, res.kind)
+    if backend == "claude":
+        if len(frames) > max_llm_frames:
+            raise ValueError(f"{len(frames)} frames would each be a paid Claude request (limit {max_llm_frames}); "
+                             "lower --fps, pass fewer files, or raise --llm-max-frames")
+        from .llm import read_screens  # needs the `llm` extras
+        results = read_screens(frames, matcher, species, progress=progress)
+    else:
+        results = []
+        for i, (label, img) in enumerate(frames):
+            res = parse(read_words(img, backend=backend), img, matcher, species)
+            results.append(res)
+            if progress:
+                progress(i + 1, len(frames), label, res.kind)
+    report.frames_read = len(results)
+    report.screens.update(res.kind for res in results)
     inv = merge(results, report)
 
     misread = sorted({p["species"] for p in inv["pokemon"]} & set(inv["not_caught"]))

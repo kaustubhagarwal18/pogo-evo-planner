@@ -149,6 +149,36 @@ What each screen provides:
   a real Pokédex recording. Next iteration: apply the Evolve button's silhouette test to a
   Pokédex scroll to get never-caught for every species at once (see the roadmap).
 
+### Reading screens with Claude (optional, `pogo_evo_planner/scan/llm.py`)
+
+`--ocr claude` replaces OCR with Claude (`claude-opus-5-5`), which reads each frame as an image
+and returns a structured reading: screen kind, Rare Candy, species, candy, the Evolve button's
+sprite, storage cells, Pokédex entries. It can identify a nicknamed Pokémon from its sprite,
+which OCR can't. Everything after that (merging frames, planning) is unchanged.
+
+```bash
+pip install -e '.[llm]'              # Anthropic SDK + Guardrails AI
+export ANTHROPIC_API_KEY=...          # or: ant auth login
+pogo-evo-planner scan bag.png detail1.png detail2.png --ocr claude --species data/latest.json
+```
+
+Every reading is checked with [Guardrails AI](https://github.com/guardrails-ai/guardrails)
+before it's used: names must match a species in the game data (after the same fuzzy matching
+OCR text gets), CP must be 10–10,000, counts must be in range, Pokédex numbers must exist, and a
+bag screen must have a Rare Candy count. If anything fails, Claude is asked once more with the
+list of failures. Values that still fail are dropped and reported as scan warnings.
+
+Before you use it:
+
+- **Your screenshots go to Anthropic's API.** OCR runs entirely on your machine; this doesn't.
+  Guardrails' own usage telemetry, which is on by default, is switched off, so validation runs
+  locally and sends nothing (a test checks this).
+- **It costs money per frame.** A rough, unmeasured estimate is a few cents per frame.
+  A screen recording yields hundreds of frames, so scans of more than 60 frames are refused
+  unless you raise `--llm-max-frames`. Screenshots, or a recording with a low `--fps`, are
+  the cheaper input.
+- It hasn't been run against real captures yet; the tests use a fake client.
+
 ### Planning (`pogo_evo_planner/planner.py`)
 
 - Cost per candy = buddy km × rarity multiplier (`data/rarity_tiers.json`, hand-tuned:
