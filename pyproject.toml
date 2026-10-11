@@ -16,6 +16,9 @@ dependencies = []  # the planner is pure stdlib
 scan = ["opencv-python-headless>=4.8", "numpy>=1.24"]
 # recommended OCR + fuzzy matching (without these, Tesseract and difflib are used)
 ocr = ["pogo-evo-planner[scan]", "rapidocr>=2", "onnxruntime>=1.16", "rapidfuzz>=3"]
+# read screens with a vision LLM instead of OCR, checked with Guardrails AI:
+# Claude (paid API) or a local model through Ollama (free)
+llm = ["pogo-evo-planner[scan]", "anthropic>=1.13", "ollama>=0.6", "guardrails-ai>=0.10"]
 dev = ["pogo-evo-planner[scan]", "pillow>=10", "pytest>=8", "ruff>=0.5",
        "pylint>=4", "mypy>=2", "bandit>=1.8", "codespell>=2.3"]
 
@@ -58,6 +61,10 @@ python_version = "3.10"
 
 [[tool.mypy.overrides]]
 module = ["rapidocr_onnxruntime"]  # older RapidOCR package name, only imported as a fallback
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["guardrails", "guardrails.*"]  # ships no type information
 ignore_missing_imports = true
 
 [tool.codespell]
