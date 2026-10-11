@@ -16,6 +16,7 @@ import sys
 import webbrowser
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from .gamemaster import load_species
 from .inventory import Inventory, load_inventory
@@ -129,6 +130,21 @@ def _read_summary(inv: dict, report) -> str:
     return f"Read {every}{len(shown)} species: {', '.join(s.replace('_', ' ').title() for s in shown)}"
 
 
+def _scan(a, files: list[str], species: dict, **kw) -> tuple[dict, Any]:
+    """Scan the files with the reader --ocr picks. Exits with a readable error instead of a traceback when a file
+    can't be read, no OCR engine is installed, or the packages for reading screens aren't installed."""
+    try:
+        from .scan.pipeline import scan  # OpenCV and the OCR or LLM packages are only needed here
+        return scan(files, species, backend=a.ocr, fps=a.fps, **kw)
+    except (ValueError, RuntimeError) as e:
+        sys.exit(f"error: {e}")
+    except ModuleNotFoundError as e:
+        extra = "llm" if a.ocr in ("llm", "ollama", "claude") else "ocr"
+        what = f"--ocr {a.ocr}" if extra == "llm" else "reading screens"
+        sys.exit(f"error: {what} needs the {e.name} module, which isn't installed. "
+                 f"In the project folder, run: pip install -e '.[{extra}]'")
+
+
 def cmd_evolvenew(a) -> None:
     """Handle `pogo-evo-planner evolvenew`: read the detail pages of the Pokémon the game's `evolvenew`
     search lists, then print what to evolve and where Rare Candy goes."""
@@ -143,7 +159,6 @@ def cmd_evolvenew(a) -> None:
     )
     from .evolvenew import render as render_evolvenew
     from .gamemaster import item_name
-    from .scan.pipeline import scan
 
     species = load_species(a.species)
     try:
@@ -156,10 +171,7 @@ def cmd_evolvenew(a) -> None:
         """Overwrite one stderr line with the frame being read."""
         print(f"\r  [{i}/{n}] {label}: {kind:<8}", end="", file=sys.stderr, flush=True)
 
-    try:
-        inv, report = scan(a.files, species, backend=a.ocr, fps=a.fps, progress=None if a.quiet else progress)
-    except ValueError as e:
-        sys.exit(f"error: {e}")
+    inv, report = _scan(a, a.files, species, progress=None if a.quiet else progress)
     if not a.quiet:
         print(file=sys.stderr)
     inv["candy"].update(candy)   # counts typed on the command line win over what was read
@@ -186,6 +198,7 @@ def cmd_evolvenew(a) -> None:
 
         def read_candy(paths: list[str]) -> dict[str, int]:
             """Read candy counts from detail-page screenshots."""
+            from .scan.pipeline import scan  # raises, so a bad path is asked again rather than exiting
             return scan(paths, species, backend=a.ocr, fps=a.fps)[0]["candy"]
 
         candy_given = ask_for_candy(plan_inv, species, ask=input, read=read_candy, say=print) if a.blocked else {}
@@ -206,19 +219,14 @@ def cmd_evolvenew(a) -> None:
 
 def cmd_scan(a) -> None:
     """Handle `pogo-evo-planner scan`: OCR the files, write the inventory, then plan or write a dashboard if asked."""
-    from .scan.pipeline import scan  # OCR deps are only needed for this command
-
     species = load_species(a.species)
 
     def progress(i, n, label, kind):
         """Overwrite one stderr line with the frame being read."""
         print(f"\r  [{i}/{n}] {label}: {kind:<8}", end="", file=sys.stderr, flush=True)
 
-    try:
-        inv, report = scan(a.files, species, backend=a.ocr, fps=a.fps, progress=None if a.quiet else progress,
-                           max_llm_frames=a.llm_max_frames, llm_model=a.llm_model)
-    except ValueError as e:
-        sys.exit(f"error: {e}")
+    inv, report = _scan(a, a.files, species, progress=None if a.quiet else progress,
+                        max_llm_frames=a.llm_max_frames, llm_model=a.llm_model)
     if not a.quiet:
         print(file=sys.stderr)
     Path(a.output).write_text(json.dumps(inv, indent=2) + "\n", encoding="utf-8")

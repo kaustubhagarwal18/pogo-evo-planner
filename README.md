@@ -45,11 +45,15 @@ Requires Python 3.10+. Get the code and set it up once:
 ```bash
 git clone https://github.com/kaustubhagarwal18/pogo-evo-planner.git
 cd pogo-evo-planner
-python3.14 -m venv .venv    # any Python >= 3.10
+python3.14 -m venv .venv
 source .venv/bin/activate
-make install-ocr            # pip install -e '.[ocr,dev]'  (RapidOCR + RapidFuzz)
-make gamemaster             # latest datamined game data -> data/latest.json
+make install-ocr
+make gamemaster
 ```
+
+Any Python 3.10 or newer works in place of `python3.14`. `make install-ocr` runs
+`pip install -e '.[ocr,dev]'` (RapidOCR and RapidFuzz), and `make gamemaster` downloads the latest
+datamined game data to `data/latest.json`.
 
 Every later session: open a terminal, `cd` into the project folder and run
 `source .venv/bin/activate`. Run the commands from that folder, so they find `data/latest.json`.
@@ -74,8 +78,11 @@ kept out of git), then:
 ```bash
 pogo-evo-planner evolvenew captures/evolvenew.mp4 captures/seen1.png captures/seen2.png \
     captures/seen3.png captures/bag.png
+```
 
-# or with screenshots of the results instead of the recording
+Or with screenshots of the results instead of the recording:
+
+```bash
 pogo-evo-planner evolvenew captures/results*.png captures/seen*.png captures/bag.png
 ```
 
@@ -183,10 +190,17 @@ To plan from your whole collection instead (including species you caught once bu
 
 ```bash
 pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
-# review inventory.json, add evolution items under "items", then:
-pogo-evo-planner plan inventory.json
+```
 
-# same plan as a self-contained HTML page (ranking, candy budget, paths, inventory):
+Review `inventory.json` and add evolution items under `"items"`, then plan:
+
+```bash
+pogo-evo-planner plan inventory.json
+```
+
+Or write the same plan as a self-contained HTML page (ranking, candy budget, paths, inventory):
+
+```bash
 pogo-evo-planner dashboard inventory.json -o dashboard.html --open
 ```
 
@@ -209,9 +223,12 @@ Try it without the game, from a fresh terminal:
 ```bash
 cd /path/to/pogo-evo-planner
 source .venv/bin/activate
-make demo    # planner on an example inventory
-make mock    # renders synthetic screens and a recording, scans them, plans
+make demo
+make mock
 ```
+
+`make demo` runs the planner on an example inventory. `make mock` renders synthetic screens and a
+recording, scans them, and plans.
 
 See [docs/CAPTURING.md](docs/CAPTURING.md) for what to record.
 
@@ -306,15 +323,24 @@ LLM, which is Ollama. Two models are supported:
 | Privacy | nothing leaves your machine | screenshots go to Anthropic |
 | Speed / accuracy | slow on a laptop; small models read less accurately | faster and more capable |
 
+Install the extras (the Anthropic SDK, the Ollama client and Guardrails AI):
+
 ```bash
-pip install -e '.[llm]'              # Anthropic SDK, Ollama client, Guardrails AI
+pip install -e '.[llm]'
+```
 
-# free, local: install Ollama from https://ollama.com and start it, then
-ollama pull qwen3-vl:4b              # 3.3 GB; fits an 8 GB Mac (qwen3-vl:2b is 1.9 GB)
+Free and local: install Ollama from https://ollama.com and start it, then pull the model
+(3.3 GB; it fits an 8 GB Mac, and `qwen3-vl:2b` is 1.9 GB) and scan:
+
+```bash
+ollama pull qwen3-vl:4b
 pogo-evo-planner scan bag.png detail.png --ocr llm --species data/latest.json
+```
 
-# paid, Claude
-export ANTHROPIC_API_KEY=...          # or: ant auth login
+Paid, with Claude (`ant auth login` works instead of setting the key):
+
+```bash
+export ANTHROPIC_API_KEY=...
 pogo-evo-planner scan bag.png detail.png --ocr claude --species data/latest.json
 ```
 
@@ -384,15 +410,14 @@ the Evolve-button silhouette check. Expect more calibration on other phones; OCR
 some CP values and the storage grid sometimes pairs a name with a neighbouring cell's CP. The
 optional LLM readers (`--ocr llm` / `ollama` / `claude`) haven't been run on real captures yet,
 so their accuracy, speed and cost are unknown. Nicknamed Pokémon can be read as the wrong
-species; see "Known issue" under the `evolvenew` quick start. See [docs/ROADMAP.md](docs/ROADMAP.md).
+species; see "Known issue" under the `evolvenew` quick start. See [docs/ROADMAP.md](docs/ROADMAP.md)
+for what's next and [CHANGELOG.md](CHANGELOG.md) for what each version changed.
 
 ## Development
 
-```bash
-make test        # all tests incl. end-to-end OCR (~30 s)
-make test-fast   # skips the OCR end-to-end test
-make lint        # ruff, pylint, mypy, bandit, codespell, and gitleaks if installed
-```
+- `make test`: all tests, including end-to-end OCR (about 30 s).
+- `make test-fast`: skips the OCR end-to-end test.
+- `make lint`: ruff, pylint, mypy, bandit, codespell, and gitleaks if installed.
 
 Linter settings live in `pyproject.toml`. Two GitHub Actions workflows run on GitHub:
 

@@ -160,8 +160,9 @@ def available_backend(preferred: str = "auto") -> str:
     if preferred in ("tesseract", "auto") and tesseract_available():
         return "tesseract"
     if preferred == "rapidocr":
-        raise RuntimeError("RapidOCR not installed: pip install 'pogo-evo-planner[ocr]'")
-    raise RuntimeError("No OCR backend found: install RapidOCR (pip install 'pogo-evo-planner[ocr]') or Tesseract")
+        raise RuntimeError("RapidOCR isn't installed. In the project folder, run: pip install -e '.[ocr]'")
+    raise RuntimeError("no OCR engine found. In the project folder, run: pip install -e '.[ocr]' "
+                       "(RapidOCR), or install Tesseract (brew install tesseract / apt install tesseract-ocr)")
 
 
 def read_words(image: np.ndarray | str | Path, backend: str = "auto") -> list[Word]:
