@@ -18,7 +18,7 @@ test-fast:          ## skip the slow OCR end-to-end test
 lint:               ## ruff, pylint, mypy, bandit, codespell (+ gitleaks if installed)
 	ruff check pogo_evo_planner tests
 	pylint pogo_evo_planner
-	pylint tests --disable=missing-function-docstring
+	pylint tests --disable=duplicate-code
 	mypy pogo_evo_planner
 	bandit -q -r pogo_evo_planner
 	codespell pogo_evo_planner tests docs scripts README.md Makefile .github

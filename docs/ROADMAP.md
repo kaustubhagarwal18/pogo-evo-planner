@@ -51,6 +51,12 @@ Next from that recording:
       Linux. Already failing at the initial commit
 - [ ] Scan speed: cache OCR per frame and merge batch recordings into one inventory, drop scroll
       frames that mostly overlap, collapse detail pages whose 3D model keeps animating
+- [ ] Paused frames aren't always collapsed: in the `evolvenew` recording, frames 1 and 2 show the
+      same grid (3.5% of pixels differ, from the recording timer, sparkle animations and video
+      compression), but `frames.same_screen` keeps both, so the same screen is OCR'd twice. The
+      result is unaffected (same species and CP count once); it only costs time. Measure how many
+      of the 84 frames are such duplicates, then loosen the check, e.g. ignore the status bar and
+      tolerate small scattered changes
 
 - [ ] Capture bag, storage, Pokédex and detail screens on 2–3 phones (different aspect
       ratios, light/dark backgrounds, at least one non-1080p device)
@@ -62,6 +68,41 @@ Next from that recording:
 - [ ] Read evolution items from the bag too (Metal Coat, Sinnoh Stone, lures…)
 - [ ] Regional forms (Alolan, Galarian…) in names and the species table
 - [ ] Non-English game languages (OCR language + localised species names)
+
+### The `evolvenew` flow
+
+- [x] `pogo-evo-planner evolvenew`: detail pages of the Pokémon the game's `evolvenew` search
+      lists, plus a Rare Candy count, give the plan in plain words (evolve now, use Rare Candy,
+      not yet, Mega only). Detail pages count as owned, one copy per CP; only evolutions into
+      never-caught species are planned; `--candy` / `--item` fix or add counts. Tried on 7 real
+      detail screenshots
+- [x] Tried on a real 30 s recording of the `evolvenew` grid (210 Pokémon, 75 species, 54 Mega
+      only), the Pokédex "Seen" screenshots and the bag: lists the 36 missing species and which
+      families' candy counts it needs; forms of one Pokédex entry are listed once
+- [x] The command asks for each missing candy count (a number, or a screenshot of that Pokémon's
+      page), then plans; tried in a real terminal with 17 families. Forms of one Pokédex entry are
+      planned once (one Dudunsparce, not both forms), and a family's Rare Candy is shown once
+- [ ] **Known bug: branching Pokémon.** `evolvenew` lists a Pokémon when at least one evolution is
+      new, but every branch is treated as new: Charcadet → Armarouge is planned although two
+      Armarouge are owned. Fix: trust a branch as new only when the "Seen" list or a detail-page
+      silhouette confirms it; otherwise mark it "check in game" or ask
+- [ ] **Known bug:** OCR reads the name under each grid cell, never the picture, and the grid
+      shows nicknames, not species. A Victreebel listed for Mega Victreebel and nicknamed
+      "99%Bellsprou…" is read as a Bellsprout, so Weepinbell is reported missing though it's owned.
+      A renamed Doublade is read as a Honedge, so Doublade is reported missing and Aegislash, the
+      real gap, isn't listed: a nickname can hide a missing species. A Houndoom whose name the
+      floating buttons half-hide is read as "Houndour".
+- [ ] **Planned fix: recognise the Pokémon from its picture with Ollama** (likely route). Use the
+      local vision model (`--ocr ollama`, default `qwen3-vl:4b`) to name the species from each
+      cell's image, at least where the name looks suspicious: a likely nickname (digits, symbols),
+      a name half-hidden by the floating buttons, or a reading that contradicts the Pokédex. OCR
+      stays the fast first pass. Needs Ollama installed and a test on the real `evolvenew`
+      recording (Doublade, Victreebel and Houndoom cells) for accuracy and seconds per cell.
+      Cheaper complements: a caught-list cross-check from the Pokédex, skipping names with digits
+      or symbols, and skipping names in the strip behind the floating buttons
+- [ ] Does swiping between detail pages stay inside the `evolvenew` results? Then one swipe-through
+      recording could give the candy counts too
+- [ ] Read evolution items (apples, stones) from the bag screenshot instead of `--item`
 
 ### LLM screen readers
 
@@ -79,6 +120,13 @@ Next from that recording:
 ## Phase 3: Better recommendations
 
 - [ ] Rarity from data rather than hand tiers (spawn/biome info, event boosts with expiry)
+- [ ] **Upcoming events:** an optional `--events` that fetches the event calendar (LeekDuck, which
+      the community project ScrapedDuck republishes as JSON; check it's still maintained first) and
+      marks families featured in the next few weeks (Community Day, Spotlight Hours, raid days).
+      For those, the plan says "wait for the event" and holds back Rare Candy, e.g. "Larvesta is
+      featured on <date>: catch and hatch then instead of spending 102 Rare Candy". Each event needs
+      its dates and an expiry, since schedules change late. Stays optional; the planner works
+      offline without it
 - [x] Collection-first value: only evolutions into a species you don't have count (owning a later
       stage covers earlier ones), the cheapest owned stage is evolved, and Rare Candy never pays
       for a repeat or gets spent just to use it up

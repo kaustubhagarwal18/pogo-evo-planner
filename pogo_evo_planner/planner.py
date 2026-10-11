@@ -100,6 +100,7 @@ class Settings:
     dex_bonus: float = 20.0          # km-equivalent value of a new Pokédex entry
     repeat_value: float = 0.0        # share of value kept by an evolution into a species you already own
     allow_trade_evolutions: bool = False  # spend candy on evolutions that are free via trade
+    new_entries_only: bool = False   # only plan evolutions into species never caught (`evolvenew`)
     rare_candy_blocked_families: frozenset = frozenset()
 
 
@@ -244,6 +245,12 @@ def family_options(family: str, specimens: list[Specimen], species: dict, inv: I
     max_candy = own_candy + inv.rare_candy
     owned = owned_species(inv, species)
     registered = (inv.pokedex | owned) - inv.not_caught
+
+    def entry(sp: str):
+        """What counts as one new species: with new_entries_only, a Pokédex entry, so the forms of one
+        species (Dudunsparce's two and three segments, Urshifu's two styles) are claimed only once."""
+        return species.get(sp, {}).get("dex", sp) if settings.new_entries_only else sp
+
     # state key: (candy, repeat_candy, new_dex_targets, new_species_claimed, items_key) -> (value, paths)
     states: dict[tuple, tuple[float, list[Path]]] = {(0, 0, frozenset(), frozenset(), ()): (0.0, [])}
     for spec in specimens:
@@ -257,16 +264,20 @@ def family_options(family: str, specimens: list[Specimen], species: dict, inv: I
                 items = Counter(dict(ikey)) + p.items
                 if not _fits(items, inv.items):
                     continue
-                new = {t for t in p.targets if t not in registered} - dex
+                new = {entry(t) for t in p.targets if t not in registered} - dex
                 base = val + settings.dex_bonus * len(new)
                 final = p.targets[-1] if p.steps else None
                 moves = []
                 # a repeat (a species you already have) may only use your own candy, never Rare Candy
                 if rep + p.candy <= own_candy:
                     moves.append((base + p.candy * cpc * settings.repeat_value, rep + p.candy, firsts))
-                if final and final not in owned and final not in firsts:
+                # new_entries_only (evolvenew): the game's own list of never-caught species decides, even
+                # where owning a later stage would suggest an earlier one was caught (Victreebel can be
+                # caught without ever having a Weepinbell)
+                unowned = final not in registered if settings.new_entries_only else final not in owned
+                if final and unowned and entry(final) not in firsts:
                     # a new species is worth the same however it is reached, so the cheapest route wins
-                    moves.append((base + from_base.get(final, p.candy) * cpc, rep, firsts | {final}))
+                    moves.append((base + from_base.get(final, p.candy) * cpc, rep, firsts | {entry(final)}))
                 for v, r, f in moves:
                     key = (c, r, dex | new, f, _items_key(items))
                     if key not in nxt or v > nxt[key][0]:

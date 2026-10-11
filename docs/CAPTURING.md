@@ -1,5 +1,19 @@
 # What to capture
 
+## The quick way: `evolvenew`
+
+1. In your Pokémon storage, search `evolvenew` and screen-record yourself scrolling slowly
+   through the results. The game lists every Pokémon whose evolution would be a new Pokédex
+   entry, including ones you can't afford yet.
+2. Open the Pokédex, tap the filter button, choose **Seen**, and screenshot the list.
+3. Screenshot your item bag showing Rare Candy.
+
+Run `pogo-evo-planner evolvenew <files>`. It lists what you're missing and which families'
+candy counts it needs. For those, screenshot one Pokémon's page per family (the candy count is
+only on that page) and run it again with those screenshots added.
+
+## The full scan
+
 Two inputs. Both can come from any phone's built-in screenshot and screen-recording tools.
 
 ## 1. Item bag screenshot

@@ -136,20 +136,6 @@ h2 { font-size: 17px; }
 .warn b { font-family: var(--display); }
 .warn p { margin: 4px 0 0; }
 
-/* inventory table */
-.tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.tools button { font: inherit; font-size: 13px; color: var(--ink-2); background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px; cursor: pointer; }
-.tools button[aria-pressed="true"] { color: var(--surface); background: var(--ink); border-color: var(--ink); }
-.tablewrap { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; min-width: 420px; }
-th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--line); }
-td { padding: 5px 10px; border-bottom: 1px solid var(--grid); }
-td .who { display: flex; align-items: center; gap: 10px; }
-.st { font-size: 12px; border-radius: 99px; padding: 1px 10px; white-space: nowrap; }
-.st.plan { color: var(--seq-1); background: var(--halo); font-weight: 500; }
-.st.trade { color: var(--good); background: var(--good-bg); font-weight: 500; }
-.st.bad { color: var(--warn-ink); background: var(--warn-bg); }
-.st.idle { color: var(--ink-3); }
 .foot { color: var(--ink-3); font-size: 12px; }
 .empty { color: var(--ink-3); font-size: 13px; }
 h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: var(--ink-2); }
@@ -169,7 +155,7 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
   <div class="grid2">
     <section class="panel">
       <h2>Where the candy goes, ranked</h2>
-      <p>Plan value per family. Hover a row for the cost.</p>
+      <p>Value per Rare Candy: where each one saves the most. Hover a row for the cost.</p>
       <div class="rank" id="rank"></div>
       <div class="axis" id="axis"></div>
       <div class="tip" id="tip"></div>
@@ -183,7 +169,7 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
   </div>
   <section class="panel">
     <h2>Evolution order</h2>
-    <p>Do these in this order. Value per candy is plan value divided by candy spent.</p>
+    <p>Best use of Rare Candy first, then the evolutions your own candy covers.</p>
     <div class="paths" id="paths"></div>
     <div id="free"></div>
   </section>
@@ -191,17 +177,6 @@ h3 { font-family: var(--display); font-size: 14px; margin: 18px 0 8px; color: va
     <h2>Not in the plan</h2>
     <p>In the inventory but not evolved this round.</p>
     <div id="skipped"></div>
-  </section>
-  <section class="panel">
-    <h2>Scanned Pokémon</h2>
-    <p id="inv-sub"></p>
-    <div class="tools" id="filters" role="group" aria-label="Filter"></div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Species</th><th>Label</th><th>Plan</th></tr></thead>
-        <tbody id="inv"></tbody>
-      </table>
-    </div>
   </section>
   <p class="foot">OCR makes mistakes. Review the inventory file before relying on the numbers.
     Sprites load from <a href="https://github.com/PokeAPI/sprites">PokeAPI</a> when online.
@@ -246,13 +221,14 @@ var SEQ = ['var(--seq-1)', 'var(--seq-2)', 'var(--seq-3)', 'var(--seq-4)'];
 
 var spend = DATA.families.filter(function (f) { return f.rare_candy > 0; });
 var own = DATA.families.filter(function (f) { return f.rare_candy === 0; });
-spend.sort(function (a, b) { return b.value - a.value; });
+function perRare(f) { return f.rare_candy ? f.value / f.rare_candy : 0; }
+spend.sort(function (a, b) { return perRare(b) - perRare(a); });   // best use of Rare Candy first
 own.sort(function (a, b) { return b.value - a.value; });
 
 $('candy-icon').src = SPRITES + 'items/rare-candy.png';
 $('candy-icon').onerror = function () { this.remove(); };
 $('source').textContent = (DATA.source ? 'Plan built from ' + DATA.source + '. ' : '') +
-  'Rare Candy is ranked by the walking distance each family saves.';
+  'Families using Rare Candy are ranked by value per Rare Candy: where it saves the most walking.';
 
 // hero gallery: every species the plan evolves into
 var newCount = 0, goals = [];
@@ -293,24 +269,24 @@ if (DATA.missing_candy.length) {
 });
 
 // ranked bars on a rounded scale
-var peak = Math.max.apply(null, spend.map(function (f) { return f.value; }).concat([1]));
+var peak = Math.max.apply(null, spend.map(perRare).concat([1]));
 var mag = Math.pow(10, Math.floor(Math.log10(peak)));
 var max = Math.ceil(peak / mag * 2) / 2 * mag;
 var tip = $('tip');
 if (!spend.length) $('rank').appendChild(el('p', 'empty', 'No Rare Candy spend recommended.'));
 spend.forEach(function (f, i) {
-  var pct = f.value / max * 100;
+  var pct = perRare(f) / max * 100;
   var row = el('div', 'row'); row.tabIndex = 0;
   row.appendChild(sprite(targets(f)[0] || f.family, 40));
   var name = el('div', 'name', who(f)); name.appendChild(el('span', null, fmt(f.rare_candy) + ' Rare Candy'));
   var track = el('div', 'track'); var bar = el('div', 'bar'); bar.style.width = pct + '%'; track.appendChild(bar);
-  var val = el('span', 'val', fmt(f.value));
+  var val = el('span', 'val', perRare(f).toFixed(1));
   if (pct > 85) { val.style.right = 'calc(' + (100 - pct) + '% + 6px)'; val.style.color = '#fff'; } else { val.style.left = pct + '%'; }
   track.appendChild(val); row.appendChild(name); row.appendChild(track);
   var show = function () {
     tip.textContent = '#' + (i + 1) + ' ' + who(f) + ' → ' + targets(f).map(title).join(' / ') + ': ' +
       fmt(f.candy_used) + ' candy (' + fmt(f.candy_owned) + ' owned + ' + fmt(f.rare_candy) + ' Rare Candy), ' +
-      f.value_per_candy.toFixed(1) + ' value per candy, saves about ' + fmt(f.km_saved) + ' km.';
+      perRare(f).toFixed(1) + ' value per Rare Candy, saves about ' + fmt(f.km_saved) + ' km of walking.';
   };
   row.addEventListener('mouseenter', show); row.addEventListener('focus', show);
   $('rank').appendChild(row);
@@ -347,7 +323,7 @@ function pathCards(list, into, startRank) {
     var c = el('div', 'path'); var head = el('div', 'top');
     if (startRank) head.appendChild(el('span', 'badge', String(startRank + i)));
     head.appendChild(el('b', null, who(f)));
-    head.appendChild(el('span', 'rk', f.value_per_candy.toFixed(1) + ' per candy'));
+    head.appendChild(el('span', 'rk', f.rare_candy ? perRare(f).toFixed(1) + ' per Rare Candy' : 'own candy'));
     c.appendChild(head);
     var extras = [];
     f.paths.forEach(function (p) {
@@ -392,30 +368,4 @@ if (skipped.length) {
 } else $('skipped').appendChild(el('p', 'empty', 'Everything is in the plan or fully evolved.'));
 if (DATA.unknown.length) $('skipped').appendChild(el('p', 'foot', 'Not in species data: ' + DATA.unknown.map(title).join(', ') + '.'));
 
-// inventory, filterable by what the plan does with each Pokémon
-function kind(status) {
-  if (/^Evolve/.test(status)) return 'plan';
-  if (/^Trade/.test(status)) return 'trade';
-  if (/^(Probably|Not in)/.test(status)) return 'bad';
-  return 'idle';
-}
-$('inv-sub').textContent = DATA.pokemon.length + ' Pokémon in the inventory.';
-var rows = DATA.pokemon.map(function (p) {
-  var tr = el('tr'); var td = el('td'); var w2 = el('span', 'who');
-  w2.appendChild(sprite(p.species, 32)); w2.appendChild(el('span', null, title(p.species))); td.appendChild(w2); tr.appendChild(td);
-  tr.appendChild(el('td', 'num', p.label));
-  var k = kind(p.status); var cell = el('td'); cell.appendChild(el('span', 'st ' + k, p.status)); tr.appendChild(cell);
-  $('inv').appendChild(tr);
-  return { tr: tr, k: k };
-});
-[['all', 'All'], ['plan', 'Evolving'], ['trade', 'Trading'], ['bad', 'Needs a look'], ['idle', 'Unchanged']].forEach(function (f, i) {
-  var n = f[0] === 'all' ? rows.length : rows.filter(function (r) { return r.k === f[0]; }).length;
-  if (!n) return;
-  var b = el('button', null, f[1] + ' · ' + n); b.type = 'button'; b.setAttribute('aria-pressed', String(i === 0));
-  b.addEventListener('click', function () {
-    $('filters').querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-    rows.forEach(function (r) { r.tr.hidden = f[0] !== 'all' && r.k !== f[0]; });
-  });
-  $('filters').appendChild(b);
-});
 </script>

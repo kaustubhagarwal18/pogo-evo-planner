@@ -31,6 +31,7 @@ GROUND_TRUTH = {
 
 
 def _font(size: int):
+    """A TrueType font at the given size: the first installed candidate, else Pillow's default."""
     for p in _FONT_CANDIDATES:
         if Path(p).exists():
             return ImageFont.truetype(p, size)
@@ -38,21 +39,25 @@ def _font(size: int):
 
 
 def _canvas(h: int = H, bg=(236, 244, 240)):
+    """A blank phone-sized screen and a drawing context for it."""
     img = Image.new("RGB", (W, h), bg)
     return img, ImageDraw.Draw(img)
 
 
 def _center(d, x, y, text, size, fill=(40, 60, 70)):
+    """Draw text horizontally centred on x, with its top at y."""
     f = _font(size)
     tw = d.textlength(text, font=f)
     d.text((x - tw / 2, y), text, font=f, fill=fill)
 
 
 def _to_bgr(img: Image.Image) -> np.ndarray:
+    """Convert a Pillow RGB image to the BGR array OpenCV uses."""
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
 
 def bag_screen() -> np.ndarray:
+    """An item bag screen listing Rare Candy, Rare Candy XL and other items with counts."""
     img, d = _canvas()
     _center(d, W / 2, 120, "ITEMS 312/3500", 64)
     rows = [("Poke Ball", 120), ("Great Ball", 85), ("Rare Candy", GROUND_TRUTH["rare_candy"]),
@@ -79,6 +84,7 @@ def storage_canvas() -> np.ndarray:
 
 
 def pokedex_screen() -> np.ndarray:
+    """A Pokédex screen: coloured sprites for caught entries, grey silhouettes for seen-only ones."""
     img, d = _canvas()
     _center(d, W / 2, 100, "POKEDEX", 64)
     entries = sorted([(n, True) for n in GROUND_TRUTH["dex_caught"]] + [(n, False) for n in GROUND_TRUTH["dex_seen"]])
@@ -91,6 +97,7 @@ def pokedex_screen() -> np.ndarray:
 
 
 def detail_screen(name: str, family: str) -> np.ndarray:
+    """A Pokémon detail page with its CP, name, stardust, family candy and EVOLVE button."""
     img, d = _canvas(bg=(250, 250, 250))
     cp = dict(GROUND_TRUTH["storage"])[name]
     _center(d, W / 2, 140, f"CP {cp}", 80)
@@ -128,6 +135,7 @@ def write_recording(path: str | Path, fps: int = 30) -> Path:
 
 
 def write_fixtures(out_dir: str | Path) -> tuple[Path, Path]:
+    """Write a bag screenshot and a screen recording of the synthetic screens; return both paths."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     bag = out / "bag.png"

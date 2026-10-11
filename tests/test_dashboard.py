@@ -14,6 +14,7 @@ TIERS = json.loads((ROOT / "pogo_evo_planner/data/rarity_tiers.json").read_text(
 
 class DashboardTest(unittest.TestCase):
     def test_view_has_sprites_and_new_dex_flags(self):
+        """The view gives dex numbers for sprites and flags steps that add a Pokédex entry."""
         # Dragonair is registered; Dragonite is not, so only the final step adds a Pokédex entry
         inv = Inventory(150, {"DRATINI": 0}, {}, {"DRAGONAIR"}, [Specimen("DRATINI")])
         view = build_view(plan(SPECIES, TIERS, inv), inv, SPECIES)
@@ -22,6 +23,7 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual(view["dex"], {"DRATINI": 147, "DRAGONAIR": 148, "DRAGONITE": 149})
 
     def test_render_embeds_view_safely(self):
+        """The view is embedded in the page, and a label like </script> can't end the script early."""
         inv = Inventory(0, {}, {}, set(), [Specimen("DRATINI", label="</script>")])
         page = render_html(build_view(plan(SPECIES, TIERS, inv), inv, SPECIES))
         self.assertNotIn("/*DATA*/null", page)

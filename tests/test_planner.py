@@ -68,6 +68,7 @@ def brute_force(inv: Inventory, settings: Settings) -> float:
 
 class PlannerTests(unittest.TestCase):
     def test_matches_brute_force_on_random_inventories(self):
+        """On 60 random inventories the plan's value equals a brute-force search of every combination."""
         rng = random.Random(7)
         pool = ["DRATINI", "DRAGONAIR", "BELDUM", "FEEBAS", "EEVEE", "ONIX", "SCYTHER",
                 "KIRLIA", "MAGIKARP", "GASTLY", "PIDGEY", "CHANSEY"]
@@ -87,6 +88,7 @@ class PlannerTests(unittest.TestCase):
             self.assertLessEqual(got.rare_candy_used, inv.rare_candy)
 
     def test_prefers_high_effort_family(self):
+        """Rare Candy goes to the family whose candy costs more walking (Feebas over Magikarp)."""
         # 70 rare candy can finish Feebas (20 km buddy) or Magikarp (1 km) but not both.
         inv = Inventory(70, {"FEEBAS": 30, "MAGIKARP": 330}, {}, set(),
                         [Specimen("FEEBAS"), Specimen("MAGIKARP")])
@@ -94,6 +96,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([f.family for f in p.families if f.rare_candy], ["FEEBAS"])
 
     def test_evolving_into_owned_species_is_a_discounted_repeat(self):
+        """Evolving into a species you own counts only repeat_value of the candy it spends."""
         cpc = cost_per_candy("DRATINI", SPECIES, TIERS)[1]
         settings = Settings(dex_bonus=20, repeat_value=0.1)
         new = plan(SPECIES, TIERS, Inventory(100, {"DRATINI": 0}, {}, set(), [Specimen("DRAGONAIR")]), settings)
@@ -108,6 +111,7 @@ class PlannerTests(unittest.TestCase):
         self.assertAlmostEqual(plan(SPECIES, TIERS, rep_inv, settings).total_value, 100 * cpc * 0.1)
 
     def test_rare_candy_prefers_a_new_species_over_a_repeat(self):
+        """Rare Candy completes a new species rather than a repeat of one you own."""
         # 100 Rare Candy finishes one evolution. Feebas (20 km buddy) is worth more per candy,
         # but Milotic is already owned while Dragonite is not.
         inv = Inventory(100, {"DRATINI": 0, "FEEBAS": 0}, {}, set(),
@@ -119,6 +123,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([f.family for f in p.families if f.rare_candy], ["DRATINI"])
 
     def test_new_species_reached_from_owned_middle_stage(self):
+        """A new species is reached from the owned middle stage, the cheaper route."""
         # Dragonite is new. Dragonair -> Dragonite (100) and Dratini -> Dragonair -> Dragonite (125)
         # both get it; the cheaper route from the owned Dragonair should win.
         inv = Inventory(125, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONAIR")])
@@ -127,6 +132,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([path.specimen.species for f in p.families for path in f.paths], ["DRAGONAIR"])
 
     def test_rare_candy_never_spent_on_a_species_you_have(self):
+        """No Rare Candy is spent on an evolution into a species you already have."""
         # Milotic is owned. Even when repeats keep their full value, Rare Candy can't pay for one...
         inv = Inventory(100, {"FEEBAS": 0}, {}, set(), [Specimen("FEEBAS"), Specimen("MILOTIC")])
         p = plan(SPECIES, TIERS, inv, Settings(repeat_value=1.0))
@@ -137,6 +143,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual((p.rare_candy_used, [f.family for f in p.families]), (0, ["FEEBAS"]))
 
     def test_repeat_does_not_push_rare_candy_onto_a_new_evolution(self):
+        """A repeat uses only own candy left over, so it can't push Rare Candy onto a new evolution."""
         # Dragonite is new (100 from Dragonair); Dratini -> Dragonair is a repeat (25).
         # With 90 own candy, doing both would need 35 Rare Candy, 25 of them only because of the repeat.
         inv = Inventory(100, {"DRATINI": 90}, {}, set(),
@@ -145,6 +152,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(p.rare_candy_used, 10)
 
     def test_never_caught_beats_a_storage_reading(self):
+        """A silhouette on an Evolve button beats a storage reading of that species."""
         # storage claims a Dragonite, but an Evolve button showed it as a silhouette: it's a misread
         inv = Inventory(100, {"DRATINI": 0}, {}, set(), [Specimen("DRAGONAIR"), Specimen("DRAGONITE")],
                         not_caught={"DRAGONITE"})
@@ -152,6 +160,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([path.targets for f in p.families for path in f.paths], [["DRAGONITE"]])
 
     def test_plain_name_covers_its_forms(self):
+        """A plain species name covers all its forms; a specific form covers only itself."""
         species = {
             "TANDEMAUS": {"dex": 924, "family": "TANDEMAUS", "buddy_km": 1, "evolutions": [
                 {"to": "MAUSHOLD_FAMILY_OF_FOUR", "candy": 50}, {"to": "MAUSHOLD_FAMILY_OF_THREE", "candy": 50}]},
@@ -169,6 +178,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(plan(species, TIERS, inv).families, [])
 
     def test_candy_count_only_missing_where_it_matters(self):
+        """A missing candy count is reported only for families that can still evolve into something new."""
         inv = Inventory(0, {}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONITE"),  # nothing new left
                                            Specimen("FEEBAS"),                           # Milotic is new
                                            Specimen("SCYTHER")])
@@ -176,6 +186,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(families_missing_candy(inv, SPECIES), ["FEEBAS"])
 
     def test_owning_final_stage_covers_middle_stage(self):
+        """Owning the final stage means the middle stage isn't new either."""
         # Dragonite is owned, so Dratini -> Dragonair gives nothing new
         inv = Inventory(25, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONITE")])
         p = plan(SPECIES, TIERS, inv)
@@ -183,6 +194,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(with_earlier_stages({"DRAGONITE"}, SPECIES), {"DRATINI", "DRAGONAIR", "DRAGONITE"})
 
     def test_duplicates_dropped_so_a_later_middle_stage_is_kept(self):
+        """Duplicate copies are dropped, so a middle stage listed after them is still planned."""
         # seven Dratini listed before the only Dragonair:
         # Dragonair -> Dragonite (100 candy) fits, Dratini's route (125) doesn't
         inv = Inventory(0, {"DRATINI": 100}, {}, set(),
@@ -192,6 +204,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([(p.specimen.label, p.targets) for p in paths], [("a", ["DRAGONITE"])])
 
     def test_branching_species_keep_one_copy_per_branch(self):
+        """A branching species keeps one copy per unowned final evolution; other species keep one."""
         mons = [Specimen(s, label=f"#{i}") for i, s in enumerate(["EEVEE"] * 10 + ["KIRLIA"] * 3 + ["DRATINI"] * 3)]
         kept = Counter(s.species for s in keep_specimens(mons, SPECIES))
         self.assertEqual(kept, {"EEVEE": 8, "KIRLIA": 2, "DRATINI": 1})
@@ -205,24 +218,28 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(targets, ["GALLADE", "GARDEVOIR"])
 
     def test_partial_top_up_is_not_spent(self):
+        """Rare Candy isn't spent when it can't complete an evolution."""
         inv = Inventory(10, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI")])
         p = plan(SPECIES, TIERS, inv)
         self.assertEqual(p.rare_candy_used, 0)
         self.assertEqual(p.families, [])
 
     def test_shared_item_used_once(self):
+        """One Metal Coat is used for one evolution, not two."""
         inv = Inventory(0, {"ONIX": 50, "SCYTHER": 50}, {"ITEM_METAL_COAT": 1}, set(),
                         [Specimen("ONIX"), Specimen("SCYTHER")])
         p = plan(SPECIES, TIERS, inv)
         self.assertEqual(len(p.families), 1)
 
     def test_trade_evolutions_suggested_not_paid(self):
+        """An evolution that's free by trading is suggested as a trade, not paid for in candy."""
         inv = Inventory(100, {"GASTLY": 0}, {}, set(), [Specimen("HAUNTER")])
         p = plan(SPECIES, TIERS, inv)
         self.assertEqual(p.rare_candy_used, 0)
         self.assertEqual([s.to for _, s in p.trade_instead], ["GENGAR"])
 
     def test_parse_raw_game_master(self):
+        """A raw PokeMiners game master entry is parsed into the species table format."""
         raw = [
             {"templateId": "V0147_POKEMON_DRATINI", "data": {"pokemonSettings": {
                 "pokemonId": "DRATINI", "familyId": "FAMILY_DRATINI", "kmBuddyDistance": 5,

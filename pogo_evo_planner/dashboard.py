@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .gamemaster import item_name
 from .inventory import Inventory
 from .planner import Plan, families_missing_candy, owned_species
 
@@ -24,7 +25,8 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
                     "Evolve to " + path.steps[-1].to.replace("_", " ").title()
             paths.append({
                 "species": path.specimen.species, "label": path.specimen.label, "candy": path.candy,
-                "steps": [{"frm": s.frm, "to": s.to, "candy": s.candy, "item": s.item, "notes": list(s.notes),
+                "steps": [{"frm": s.frm, "to": s.to, "candy": s.candy,
+                           "item": item_name(s.item) if s.item else None, "notes": list(s.notes),
                            "new_dex": s.to not in registered} for s in path.steps],
             })
         families.append({
@@ -38,10 +40,14 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
         trade.append({"species": spec.species, "label": spec.label, "frm": step.frm, "to": step.to,
                       "candy": step.candy})
 
+    evolving = {species for species, _ in planned}
+
     def status(sp) -> str:
         """Describe what the plan does with one owned Pokémon."""
         if (sp.species, sp.label) in planned:
             return planned[(sp.species, sp.label)]
+        if sp.species in evolving:
+            return "Another one is evolved"   # an extra copy, not something the plan left out
         if sp.species in inv.not_caught:
             return "Probably misread: an Evolve button shows it as never caught"
         if sp.species not in species:

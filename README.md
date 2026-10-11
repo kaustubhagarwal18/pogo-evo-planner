@@ -12,8 +12,20 @@
 ![RapidFuzz 3.14](https://img.shields.io/badge/RapidFuzz-3.14-blue)
 ![Tesseract 5.5](https://img.shields.io/badge/Tesseract-5.5_%28fallback%29-lightgrey)
 
+![Anthropic SDK 1.13](https://img.shields.io/badge/Anthropic_SDK-1.13-D97757?logo=anthropic&logoColor=white)
+![Ollama 0.6](https://img.shields.io/badge/Ollama-0.6_%28qwen3--vl%3A4b%29-black?logo=ollama&logoColor=white)
+![Guardrails AI 0.10](https://img.shields.io/badge/Guardrails_AI-0.10-6E56CF)
+![Pydantic 2.14](https://img.shields.io/badge/Pydantic-2.14-E92063?logo=pydantic&logoColor=white)
+
+![pylint 4.1](https://img.shields.io/badge/pylint-4.1-2A5ADA)
+![mypy 2.4](https://img.shields.io/badge/mypy-2.4-1F5082)
+![bandit 1.9](https://img.shields.io/badge/bandit-1.9-yellow)
+![gitleaks 8.30](https://img.shields.io/badge/gitleaks-8.30-red)
+
 Tells a Pokémon GO player which evolutions to do and where their Rare Candy saves the
 most effort, from screenshots and a screen recording of their own game.
+
+![Dashboard: 304 of 305 Rare Candy, ranked by value per Rare Candy, with the evolution order](docs/dashboard.png)
 
 ```
 screenshot of item bag ─┐                                         ┌─► text report
@@ -27,32 +39,152 @@ long-running scanner apps stay behind, and it keeps accounts safe from Terms of 
 
 ## Quick start
 
-Requires Python 3.10+. Use a virtualenv (activate it in every new terminal):
+Requires Python 3.10+. Get the code and set it up once:
 
 ```bash
+git clone https://github.com/kaustubhagarwal18/pogo-evo-planner.git
+cd pogo-evo-planner
 python3.14 -m venv .venv    # any Python >= 3.10
 source .venv/bin/activate
+make install-ocr            # pip install -e '.[ocr,dev]'  (RapidOCR + RapidFuzz)
+make gamemaster             # latest datamined game data -> data/latest.json
 ```
 
-Then:
+Every later session: open a terminal, `cd` into the project folder and run
+`source .venv/bin/activate`. Run the commands from that folder, so they find `data/latest.json`.
+
+### The quick way: `evolvenew`
+
+The game already knows most of the answer. Capture three things:
+
+1. **`evolvenew`**: in your Pokémon storage, search `evolvenew` and screen-record yourself
+   scrolling through the results. They're the Pokémon whose evolution would be a new Pokédex
+   entry, including ones you can't afford yet, and those listed only for a Mega Evolution.
+2. **The Pokédex, filtered to Seen**: screenshot the list. Those are species you've seen but
+   never caught.
+3. **Your item bag**, showing Rare Candy (or pass `--rare-candy N` instead).
+
+Copy the recording and screenshots from your phone into the project's `captures/` folder (it's
+kept out of git), then:
 
 ```bash
-make install-ocr        # pip install -e '.[ocr,dev]'  (RapidOCR + RapidFuzz)
-make gamemaster         # latest datamined game data -> data/latest.json
+pogo-evo-planner evolvenew captures/evolvenew.mp4 captures/seen1.png captures/seen2.png \
+    captures/seen3.png captures/bag.png
+```
 
-pogo-evo-planner scan bag.png recording.mp4 -o inventory.json --species data/latest.json
+Reading a 30-second recording takes about 3 minutes. The tool then tells you which species
+you're missing (a real run, shortened):
+
+```
+You're missing 36 species.
+
+Evolve into these (from Pokémon you own):
+  Dragapult                                from Drakloak        100 candy, candy ?
+  Garganacl                                from Naclstack       100 candy, candy ?
+  Kingambit                                from Bisharp         100 candy, candy ? (needs an evolution quest)
+  Urshifu (Rapid Strike or Single Strike)  from Kubfu           200 candy, candy ? (needs an evolution quest)
+  ...
+
+Catch these (seen, but nothing you own evolves into them):
+  Carnivine, Chatot, Comfey, Dhelmise, Gholdengo, Gimmighoul, Hawlucha, ...
+
+Mega Evolution only (54, need Mega Energy, not planned):
+  Abomasnow, Aerodactyl, Aggron, ...
+
+To plan your 305 Rare Candy for the rest, add each family's candy count: screenshot one
+Pokémon's page per family, or use --candy NAME=N:
+  Applin, Bellsprout, Blipbug (e.g. Dottler), Charcadet, Dreepy (e.g. Drakloak), ...
+```
+
+Next it asks for those candy counts, one family at a time, then for the evolution items the
+missing species need (apples, Sinnoh Stone, lure modules…):
+
+```
+18 families need a candy count. For each, type the number, or the path of a screenshot of that
+Pokémon's page (you can drag the file in), or press Enter to skip; q stops.
+Nacli candy (Naclstack → Garganacl needs 100): 72
+Dreepy candy (Drakloak → Dragapult needs 100): captures/drakloak.png
+  read 92
+...
+3 evolution items are needed. For each, type how many you have (Enter if none; q stops).
+Sweet Apple (Applin → Appletun): how many? 23
+...
+```
+
+The candy count is shown on any Pokémon's page in that family. With the answers it prints the
+Rare Candy plan, saves the answers, and shows the `--candy` and `--item` options that skip the
+questions next time (`--candy Naclstack=72` takes a Pokémon's name or its family's;
+`--item "Tart Apple=26"`). `--no-ask` only lists what's missing. The plan looks like this:
+
+```
+Rare Candy: 110 of 305 used
+
+Evolve now with your own candy:
+  Floette → Florges Red (needs an evolution quest)
+
+Use Rare Candy:
+  Drakloak → Dragapult  +8 Rare Candy
+  Larvesta → Volcarona  +102 Rare Candy
+
+Not yet:
+  Applin → Flapple: needs Tart Apple: if you have one, add --item "Tart Apple=N"
+  Snom → Frosmoth: 298 candy short (have 102 of 400) (evolve at night; needs an evolution quest)
+```
+
+"Use Rare Candy" lists the best use first: value per Rare Candy, so 8 Rare Candy that finish
+Dragapult come before 102 for Volcarona. "Evolve now" doesn't depend on Rare Candy: an evolution
+your own candy covers is listed however few Rare Candy you have. Only evolutions into species
+you've never caught are planned, one form per Pokédex entry, and Rare Candy is never spent on a
+family whose candy count is unknown. Detail pages count as Pokémon you own, one per CP, so
+include a page for each copy of a Pokémon with several evolutions (Applin, Eevee) you'd evolve.
+What was read and answered is saved to `evolvenew.json`; `--dashboard plan.html` also writes the
+HTML dashboard.
+
+#### Known issue: Pokémon with several evolutions
+
+`evolvenew` lists a Pokémon when **at least one** of its evolutions is new, but the tool treats
+every branch as new. A Charcadet is listed because Ceruledge is new, so the plan also suggests
+Charcadet → Armarouge, although the player owns two Armarouge (an owned Armarouge isn't on the
+`evolvenew` list, so the tool can't see it). Check branching Pokémon (Charcadet, Kubfu, Applin,
+Eevee…) in the game before evolving; a detail-page screenshot shows each branch's silhouette.
+
+#### Known issue: nicknamed Pokémon
+
+OCR reads the name under each Pokémon in the grid, never its picture, and the grid shows a
+Pokémon's nickname rather than its species. A nickname that looks like another species is read
+as that species. Two cases from the real run above:
+
+- A Victreebel, on the list for Mega Victreebel and nicknamed "99%Bellsprou…", is read as a
+  Bellsprout, so **Weepinbell is reported missing although the player owns one**.
+- A renamed Doublade is read as a Honedge, so **Doublade is reported missing (it's owned) and
+  Aegislash, the species really missing, isn't listed at all**. A nickname can hide a gap, not
+  just add a false one.
+
+A name half-hidden behind the floating buttons at the bottom of the screen can be misread the
+same way (a Houndoom read as "Houndour").
+
+Until this is fixed, clear nicknames on the Pokémon in your `evolvenew` results before
+recording, and check any surprising entry in the game. The planned fix is to recognise the
+Pokémon from its picture with a local vision model through Ollama (see the roadmap).
+
+### The full scan
+
+To plan from your whole collection instead (including species you caught once but no longer own):
+
+```bash
+pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
 # review inventory.json, add evolution items under "items", then:
-pogo-evo-planner plan inventory.json --species data/latest.json
+pogo-evo-planner plan inventory.json
 
 # same plan as a self-contained HTML page (ranking, candy budget, paths, inventory):
-pogo-evo-planner dashboard inventory.json --species data/latest.json -o dashboard.html --open
+pogo-evo-planner dashboard inventory.json -o dashboard.html --open
 ```
 
 `pogo-evo-planner scan ... --dashboard dashboard.html` scans and writes the dashboard in one go.
 
-Always pass `--species data/latest.json` when scanning. Without it the scanner matches names
-against the small bundled sample, and every species missing from it (all of Paldea, for
-example) is silently dropped.
+Every command uses `data/latest.json` when it exists; without it (not run from the project
+folder, or before `make gamemaster`) they fall back to a small bundled sample, and every species
+missing from it (all of Paldea, for example) is silently dropped. `--species` picks another file.
 
 Scanning took about 1.5 s per frame with RapidOCR on an Apple Silicon laptop. A recording is sampled at
 3 fps, so a few minutes of scrolling can take 10+ minutes to scan. `--fps 1` is about three times
@@ -89,34 +221,26 @@ Dratini family: 100 candy (60 owned + 40 rare) - saves ~200 km of buddy walking
    Haunter -> Gengar is free when traded
 ```
 
-## Example dashboard (a real recording)
+## Example dashboard (a real player, today)
 
-`pogo-evo-planner dashboard` on a real scan: one bag screenshot plus a screen recording of storage
-and detail pages (424 frames, 169 Pokémon read).
+The dashboard for a real player, built with `evolvenew` from one screen recording of the
+`evolvenew` results (210 Pokémon), three Pokédex "Seen" screenshots, the candy counts typed in
+when asked, and the apples from one detail page. It's the picture at the top of this README.
 
-> **Partial collection.** Not all of the player's Pokémon were recorded, so this plan only
-> covers the ones in the recording. Pokémon that weren't scrolled past are missing (a Maushold
-> was added by hand). 14 recorded families have no candy count, but none of them can evolve into
-> a species the player doesn't have, so they don't affect this plan. The plan will change as more
-> of the collection is recorded.
-
-![Dashboard: 123 of 305 Rare Candy spent, ranked families, candy budget and evolution order](docs/dashboard.png)
-
-| Rare Candy | Evolution | Candy needed (owned + Rare) |
+| Use Rare Candy (best use first) | Rare Candy | Candy needed (owned + Rare) |
 |---|---|---|
-| 28 | Naclstack → Garganacl | 100 (72 + 28) |
-| 8 | Drakloak → Dragapult | 100 (92 + 8) |
-| 34 | Toedscool → Toedscruel | 50 (16 + 34) |
-| 9 | Glimmet → Glimmora | 50 (41 + 9) |
-| 44 | Clobbopus → Grapploct | 50 (6 + 44) |
-| 0 | Kubfu → Urshifu, Charcadet → Ceruledge, Flittle → Espathra | own candy only |
+| Drakloak → Dragapult | 8 | 100 (92 + 8) |
+| Naclstack → Garganacl | 23 | 100 (77 + 23) |
+| Applin → Appletun, Flapple, Dipplin (with apples) | 129 | 600 (471 + 129) |
+| Larvesta → Volcarona | 102 | 400 (298 + 102) |
+| Toedscool → Toedscruel | 26 | 50 (24 + 26) |
+| Rolycoly → Carkol | 16 | 25 (9 + 16) |
 
-Every one is a species the player doesn't have yet; 182 Rare Candy is left unspent rather than
-used on repeats. Rows are in the dashboard's order, by plan value. The Evolve buttons confirm four
-of the targets were never caught (Garganacl, Glimmora, Toedscruel, Espathra). The scan's manual
-fixes before this result: removed a Kubfu that was really a Kleavor's CP, added three candy
-counts and the missing Maushold, and removed Dragapult from the Pokédex list (an Evolve button
-was read as caught, but the player never caught one).
+Eight more families evolve with the player's own candy alone (Kingambit, Krookodile, Ceruledge,
+Annihilape, Dudunsparce, Espathra…). 304 of 305 Rare Candy is used; the last one can't finish
+any remaining evolution (the smallest gap is 39). Two suggestions are known bugs (see "Known
+issue" above): Charcadet → Armarouge, though two Armarouge are owned, and Honedge → Doublade,
+where the "Honedge" is a renamed Doublade.
 
 ## How it works
 
@@ -224,10 +348,10 @@ against real captures yet; the tests use fake clients.
 ### Dashboard (`pogo_evo_planner/dashboard.py`)
 
 Renders the same plan as one self-contained HTML file from `pogo_evo_planner/data/dashboard.html`:
-the species the plan evolves into, summary, families ranked by value, the Rare Candy budget,
-evolution order (with a "New" tag where an evolution adds a Pokédex entry), skipped Pokémon,
-and the scanned inventory, filterable by what the plan does to each. It flags families whose
-candy count wasn't scanned. Pokémon sprites and artwork load from
+the species the plan evolves into, summary, families ranked by value per Rare Candy (best use
+first), the Rare Candy budget, evolution order (with a "New" tag where an evolution adds a
+Pokédex entry), and the Pokémon left out of the plan (an extra copy of a species being evolved
+isn't listed). It flags families whose candy count wasn't scanned. Pokémon sprites and artwork load from
 [PokeAPI's sprite repository](https://github.com/PokeAPI/sprites) by national dex number when
 online; offline, each shows its initial instead. The file lists your Pokémon, so it is gitignored
 like `inventory.json`.
@@ -248,7 +372,8 @@ with the sample data, and the wrapped Candy XL label being read as regular candy
 the Evolve-button silhouette check. Expect more calibration on other phones; OCR still garbles
 some CP values and the storage grid sometimes pairs a name with a neighbouring cell's CP. The
 optional LLM readers (`--ocr llm` / `ollama` / `claude`) haven't been run on real captures yet,
-so their accuracy, speed and cost are unknown. See [docs/ROADMAP.md](docs/ROADMAP.md).
+so their accuracy, speed and cost are unknown. Nicknamed Pokémon can be read as the wrong
+species; see "Known issue" under the `evolvenew` quick start. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Development
 
