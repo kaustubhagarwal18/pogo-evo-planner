@@ -209,34 +209,28 @@ Dratini family: 100 candy (60 owned + 40 rare) - saves ~200 km of buddy walking
    Haunter -> Gengar is free when traded
 ```
 
-## Example dashboard (a real recording)
+## Example dashboard (a real player, today)
 
-`pogo-evo-planner dashboard` on a real scan: one bag screenshot plus a screen recording of storage
-and detail pages (424 frames, 169 Pokémon read).
+The dashboard for a real player, built with `evolvenew` from one screen recording of the
+`evolvenew` results (210 Pokémon), three Pokédex "Seen" screenshots, the candy counts typed in
+when asked, and the apples from one detail page:
 
-> **Partial collection.** Not all of the player's Pokémon were recorded, so this plan only
-> covers the ones in the recording. Pokémon that weren't scrolled past are missing (a Maushold
-> was added by hand). 14 recorded families have no candy count, but none of them can evolve into
-> a species the player doesn't have, so they don't affect this plan. The plan will change as more
-> of the collection is recorded.
+![Dashboard: 304 of 305 Rare Candy, ranked by value per Rare Candy, with the evolution order](docs/dashboard.png)
 
-![Dashboard: 123 of 305 Rare Candy spent, ranked families, candy budget and evolution order](docs/dashboard.png)
-
-| Rare Candy | Evolution | Candy needed (owned + Rare) |
+| Use Rare Candy (best use first) | Rare Candy | Candy needed (owned + Rare) |
 |---|---|---|
-| 28 | Naclstack → Garganacl | 100 (72 + 28) |
-| 8 | Drakloak → Dragapult | 100 (92 + 8) |
-| 34 | Toedscool → Toedscruel | 50 (16 + 34) |
-| 9 | Glimmet → Glimmora | 50 (41 + 9) |
-| 44 | Clobbopus → Grapploct | 50 (6 + 44) |
-| 0 | Kubfu → Urshifu, Charcadet → Ceruledge, Flittle → Espathra | own candy only |
+| Drakloak → Dragapult | 8 | 100 (92 + 8) |
+| Naclstack → Garganacl | 23 | 100 (77 + 23) |
+| Applin → Appletun, Flapple, Dipplin (with apples) | 129 | 600 (471 + 129) |
+| Larvesta → Volcarona | 102 | 400 (298 + 102) |
+| Toedscool → Toedscruel | 26 | 50 (24 + 26) |
+| Rolycoly → Carkol | 16 | 25 (9 + 16) |
 
-Every one is a species the player doesn't have yet; 182 Rare Candy is left unspent rather than
-used on repeats. Rows are in the dashboard's order, by plan value. The Evolve buttons confirm four
-of the targets were never caught (Garganacl, Glimmora, Toedscruel, Espathra). The scan's manual
-fixes before this result: removed a Kubfu that was really a Kleavor's CP, added three candy
-counts and the missing Maushold, and removed Dragapult from the Pokédex list (an Evolve button
-was read as caught, but the player never caught one).
+Eight more families evolve with the player's own candy alone (Kingambit, Krookodile, Ceruledge,
+Annihilape, Dudunsparce, Espathra…). 304 of 305 Rare Candy is used; the last one can't finish
+any remaining evolution (the smallest gap is 39). Two suggestions are known bugs (see "Known
+issue" above): Charcadet → Armarouge, though two Armarouge are owned, and Honedge → Doublade,
+where the "Honedge" is a renamed Doublade.
 
 ## How it works
 
