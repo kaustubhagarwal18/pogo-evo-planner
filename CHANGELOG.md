@@ -19,7 +19,8 @@ Before 1.0, a new minor version may change commands or file formats.
 
 ### Changed
 
-- Tests also run on Python 3.11, and on pull requests from forks.
+- Tests also run on Python 3.11. They run on pull requests (including from forks) and pushes to
+  `main`, not on every branch push.
 - Linter versions are pinned, so `make lint` runs the same versions as CI.
 
 ## [0.1.0] - 2026-10-11

@@ -426,9 +426,10 @@ for what's next and [CHANGELOG.md](CHANGELOG.md) for what each version changed.
 Linter settings and pinned linter versions live in `pyproject.toml`, so `make lint` runs what CI
 runs. Two GitHub Actions workflows run on GitHub:
 
-- **tests** (`.github/workflows/tests.yml`): everything in `tests/` with pytest, on every push to
-  any branch, on pull requests from forks, and by hand from the Actions tab. `test` uses the
-  Tesseract backend on Python 3.10 to 3.14; `test-rapidocr` uses RapidOCR (non-blocking).
+- **tests** (`.github/workflows/tests.yml`): everything in `tests/` with pytest, on pull requests
+  (including from forks), on pushes to `main`, and by hand from the Actions tab for a branch
+  without a pull request. `test` uses the Tesseract backend on Python 3.10 to 3.14;
+  `test-rapidocr` uses RapidOCR (non-blocking).
 - **ci** (`.github/workflows/ci.yml`), on pushes to `main` and on pull requests: `lint` (ruff,
   pylint, mypy, bandit, codespell) and `secrets` (gitleaks over the full git history).
 
