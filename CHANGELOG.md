@@ -3,7 +3,7 @@
 Each version's changes and known issues. Versions follow [Semantic Versioning](https://semver.org/).
 Before 1.0, a new minor version may change commands or file formats.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-11
 
 The first release. Run it from a clone of this repository, as the README's quick start shows. It
 isn't published on PyPI.
