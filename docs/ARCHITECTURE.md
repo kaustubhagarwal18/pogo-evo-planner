@@ -152,7 +152,7 @@ The choice is an exact optimisation, not a greedy sort, in two stages.
 ```mermaid
 flowchart TD
     INV[(inventory)] --> GRP[group specimens by family]
-    GRP --> CAP[per family: best 6 by IV]
+    GRP --> CAP[per family: first specimen of each species;<br/>branching lines: one per unowned branch]
     CAP --> EN[enumerate_paths per specimen<br/>every chain incl. 'do nothing';<br/>trade_free steps → 'trade instead' list]
     EN --> FDP["family DP over specimens<br/>state: candy, repeat candy, dex claimed,<br/>species claimed, items"]
     FDP --> OPT["family options<br/>(candy, items) → best value"]
@@ -164,7 +164,11 @@ flowchart TD
 
 ### 4a. Per family (`family_options`)
 
-1. Up to `max_specimens_per_family` (6) specimens, highest IV first, keep the DP small.
+1. `keep_specimens` keeps one specimen per species, the first listed, and drops later
+   duplicates. A species whose line branches (Eevee; Kirlia → Gardevoir or Gallade; Charcadet →
+   Armarouge or Ceruledge) keeps one copy per final evolution you don't own yet, so each copy can
+   take a different branch. This keeps the DP small. IVs are ignored. Worst case: 8 Eevees with
+   lures and no Eeveelutions owned takes about 6 s; a typical inventory plans in under a second.
 2. `enumerate_paths` lists every path from each specimen, including multi-step and branched
    ones, plus the empty path. Steps marked `trade_free` are not taken; they go to the
    "trade instead" list (unless `allow_trade_evolutions`).
@@ -206,7 +210,6 @@ evolved", "Not planned", "Not in species data", or "Probably misread" (in storag
 | `dex_bonus` | 20 | `--dex-bonus` | km-equivalent value of a new Pokédex entry |
 | `repeat_value` | 0 | `--repeat-value` | share of value kept by evolving into a species already owned |
 | `allow_trade_evolutions` | off | `--allow-trade-evos` | spend candy on evolutions that are free by trading |
-| `max_specimens_per_family` | 6 | — | DP size cap |
 | `rare_candy_blocked_families` | none | — | families that may only use their own candy |
 
 ## 6. Where to look

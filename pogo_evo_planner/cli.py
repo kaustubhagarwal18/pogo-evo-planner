@@ -47,9 +47,8 @@ def render(p: Plan) -> str:
                 line += ")"
             out.append(line)
             for path in f.paths:
-                iv = f" {path.specimen.iv_pct}%" if path.specimen.iv_pct is not None else ""
                 chain = " -> ".join([_title(path.steps[0].frm)] + [_title(s.to) for s in path.steps])
-                out.append(f"   {chain}  [{path.specimen.label}{iv}]")
+                out.append(f"   {chain}")
                 for s in path.steps:
                     extras = ([f"needs {s.item.removeprefix('ITEM_').replace('_', ' ').title()}"] if s.item else []) + list(s.notes)
                     if extras:
@@ -58,7 +57,8 @@ def render(p: Plan) -> str:
     if p.trade_instead:
         out.append("== Trade instead of spending candy ==")
         for spec, step in p.trade_instead:
-            out.append(f"   {_title(step.frm)} -> {_title(step.to)} is free when traded (from {_title(spec.species)} {spec.label})")
+            via = f" (from {_title(spec.species)})" if spec.species != step.frm else ""
+            out.append(f"   {_title(step.frm)} -> {_title(step.to)} is free when traded{via}")
         out.append("")
     if p.unknown_species:
         out.append("Not in species data (skipped): " + ", ".join(p.unknown_species))
