@@ -25,6 +25,8 @@ class ScanReport:
     frames_read: int = 0
     screens: Counter = field(default_factory=Counter)
     warnings: list[str] = field(default_factory=list)
+    listed: int | None = None   # how many Pokémon the storage search found, from the "(210)" under the tab
+    grid: int = 0               # how many of the storage grid's Pokémon were read
 
 
 def load_images(paths: Sequence[str | Path], fps: float = 3.0) -> list[tuple[str, np.ndarray]]:
@@ -120,6 +122,14 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     covered = Counter(sp for sp, _ in with_cp)
     for sp, n in sorted(no_cp.items()):
         pokemon += [{"species": sp, "cp": None, "label": "CP ?"}] * max(0, n - covered[sp])
+    found = Counter(r.listed for r in results if r.listed)
+    report.listed = found.most_common(1)[0][0] if found else None
+    report.grid = len(pokemon)
+    if report.listed and report.grid < report.listed:
+        report.warnings.append(
+            f"read {report.grid} of the {report.listed} Pokémon your search found: rows were skipped between "
+            "screenshots or frames. Take screenshots that overlap by a row or two (the floating buttons hide "
+            "the bottom row's names), or record the scroll instead")
     # a detail page proves you own that Pokémon, even when the storage grid wasn't captured
     listed = {p["species"] for p in pokemon}
     pokemon += [{"species": sp, "cp": None, "label": "detail page"} for sp in sorted(shown - listed)]

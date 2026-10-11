@@ -30,6 +30,7 @@ except ImportError:
 _NUM = re.compile(r"^[x×X*]?(\d{1,3}(?:[,.]\d{3})+|\d+)$")
 _CP_JOINED = re.compile(r"^CP(\d{2,5})$", re.IGNORECASE)
 _DEX_NUM = re.compile(r"^(?:#|No\.?)?0*(\d{1,4})$")
+_LISTED = re.compile(r"\((\d{1,4})\)$")   # "(210)" under the POKÉMON tab; OCR reads the search icon as "Q"
 
 
 def norm(s: str) -> str:
@@ -83,6 +84,7 @@ class ScreenResult:
     dex_caught: set[str] = field(default_factory=set)
     dex_seen_only: set[str] = field(default_factory=set)
     dex_not_caught: set[str] = field(default_factory=set)      # evolve button shows a silhouette
+    listed: int | None = None                                    # storage: how many Pokémon a search found
     notes: list[str] = field(default_factory=list)
 
 
@@ -325,9 +327,19 @@ def _candy_label(words: list[Word], line: list[Word], i: int, m: SpeciesMatcher)
     return (sp, above + [candy]) if sp else None
 
 
+def _listed(words: list[Word]) -> int | None:
+    """How many Pokémon a storage search found: the "(210)" below the POKÉMON tab. None without a search."""
+    for tab in (t for t in words if norm(t.text) == "POKEMON"):
+        for word in words:
+            found = _LISTED.search(word.text.replace(" ", ""))
+            if found and abs(word.cx - tab.cx) < tab.w and 0 < word.cy - tab.cy < 3 * tab.h:
+                return int(found.group(1))
+    return None
+
+
 def parse_storage(words: list[Word], m: SpeciesMatcher) -> ScreenResult:
     """Pair each species name in the storage grid with the CP shown above it in the same cell."""
-    r = ScreenResult("storage")
+    r = ScreenResult("storage", listed=_listed(words))
     # CP labels as (centre x, centre y, width, value); "CP 1234" may be one word or two
     cps: list[tuple[float, float, float, int]] = []
     for line in _lines(words):

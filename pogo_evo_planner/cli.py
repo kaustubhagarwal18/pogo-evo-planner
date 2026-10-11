@@ -122,6 +122,13 @@ def cmd_dashboard(a) -> None:
     _write_dashboard(a, load_species(a.species), a.inventory, a.output, str(a.inventory))
 
 
+def _read_summary(inv: dict, report) -> str:
+    """One line on what was read: the species, and "all 210 Pokémon your search found" once every one was."""
+    shown = sorted({p["species"] for p in inv["pokemon"]})
+    every = f"all {report.listed} Pokémon your search found, " if report.listed and report.grid >= report.listed else ""
+    return f"Read {every}{len(shown)} species: {', '.join(s.replace('_', ' ').title() for s in shown)}"
+
+
 def cmd_evolvenew(a) -> None:
     """Handle `pogo-evo-planner evolvenew`: read the detail pages of the Pokémon the game's `evolvenew`
     search lists, then print what to evolve and where Rare Candy goes."""
@@ -164,8 +171,7 @@ def cmd_evolvenew(a) -> None:
     inv, listing = apply_evolvenew(inv, species)
     Path(a.output).write_text(json.dumps(inv, indent=2) + "\n", encoding="utf-8")
 
-    shown = sorted({p["species"] for p in inv["pokemon"]})
-    print(f"Read {len(shown)} Pokémon: {', '.join(s.replace('_', ' ').title() for s in shown)}", file=sys.stderr)
+    print(_read_summary(inv, report), file=sys.stderr)
     for w in report.warnings:   # the plan below covers missing candy and Rare Candy itself
         if not w.startswith(("no candy count for", "no item bag screen")):
             print(f"  ! {w}", file=sys.stderr)
@@ -253,10 +259,13 @@ def build_parser() -> argparse.ArgumentParser:
     d.set_defaults(func=cmd_dashboard)
 
     e = sub.add_parser("evolvenew", help="plan from the Pokémon the game's `evolvenew` search lists (quickest)",
-                       description="In Pokémon GO, search `evolvenew` in your Pokémon storage, then screenshot "
-                                   "each listed Pokémon's page (or record yourself swiping through them). Pass "
-                                   "those files and your Rare Candy count.")
-    e.add_argument("files", nargs="+", help="detail-page screenshots and/or a recording, optionally the item bag")
+                       description="In Pokémon GO, search `evolvenew` in your Pokémon storage and screen-record "
+                                   "yourself scrolling through the results, or screenshot them as you scroll "
+                                   "(overlap a row or two). Add screenshots of the Pokédex filtered to Seen and "
+                                   "your item bag (or --rare-candy).")
+    e.add_argument("files", nargs="+",
+                   help="a recording or screenshots of the evolvenew results, Pokédex Seen screenshots, the item "
+                        "bag, and any detail pages")
     e.add_argument("--rare-candy", type=int, help="your Rare Candy count (instead of a bag screenshot)")
     e.add_argument("--candy", action="append", default=[], metavar="NAME=N",
                    help="set or fix a candy count, e.g. --candy NACLI=72 or --candy Naclstack=72 (repeatable)")

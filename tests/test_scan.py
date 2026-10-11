@@ -171,6 +171,13 @@ class ParserTests(unittest.TestCase):
         words = [w("CP", 92, 600), w("389", 176, 600), w("Dragonair", 415, 100, 220), w("Chansey", 73, 890, 170)]
         self.assertEqual(parse_storage(words, M).specimens, [("CHANSEY", 389)])
 
+    def test_storage_reads_how_many_a_search_found(self):
+        """The "(210)" below the POKÉMON tab is how many Pokémon a search found; a count elsewhere isn't."""
+        tabs = [w("POKÉMON", 431, 106, 218, 49), w("EGGS", 811, 110), w("11/12", 811, 171), w("(5)", 456, 900)]
+        cells = [w("CP", x, 600) for x in (100, 400, 700)]
+        self.assertEqual(parse_storage(tabs + [w("Q(210)", 456, 170, 130, 47)] + cells, M).listed, 210)
+        self.assertIsNone(parse_storage(tabs + cells, M).listed)   # no search: nothing to check against
+
     def test_pokedex_colour_decides_caught(self):
         """On an unfiltered Pokédex a coloured sprite reads as caught, a grey one as seen only."""
         img = np.full((800, 600, 3), 235, np.uint8)
@@ -231,6 +238,17 @@ class ParserTests(unittest.TestCase):
         inv = merge(frames, rep)
         self.assertEqual((inv["not_caught"], inv["pokedex"]), (["DRAGAPULT"], []))
         self.assertTrue(any(x.startswith("PAWMO:") for x in rep.warnings))   # a tie decides nothing
+
+    def test_merge_warns_when_rows_were_skipped(self):
+        """Fewer Pokémon read than the search found means screenshots skipped rows; reading them all doesn't warn."""
+        first = ScreenResult("storage", specimens=[("DRATINI", 412), ("FEEBAS", 126)], listed=3)
+        rep = ScanReport()
+        merge([first], rep)
+        self.assertEqual((rep.listed, rep.grid), (3, 2))
+        self.assertTrue(any(x.startswith("read 2 of the 3 Pokémon") for x in rep.warnings))
+        rep = ScanReport()
+        merge([first, ScreenResult("storage", specimens=[("FEEBAS", 126), ("CHANSEY", 389)], listed=3)], rep)
+        self.assertEqual((rep.grid, rep.warnings), (3, []))   # an overlapping row is counted once
 
     def test_merge_votes_and_dedupes(self):
         """Merging votes on candy counts and counts each storage Pokémon once across frames."""

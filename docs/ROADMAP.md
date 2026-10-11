@@ -82,6 +82,10 @@ Next from that recording:
 - [x] The command asks for each missing candy count (a number, or a screenshot of that Pokémon's
       page), then plans; tried in a real terminal with 17 families. Forms of one Pokédex entry are
       planned once (one Dudunsparce, not both forms), and a family's Rare Candy is shown once
+- [x] Screenshots of the `evolvenew` results work instead of the recording. The count under the
+      POKÉMON tab ("(210)") is read, and the scan warns when fewer Pokémon were read. Tried on
+      frames of the real recording used as screenshots: 17 read 180 of 210 (4 species lost), 28
+      read 204 of 210 (1 species lost), with the warning both times
 - [ ] **Known bug: branching Pokémon.** `evolvenew` lists a Pokémon when at least one evolution is
       new, but every branch is treated as new: Charcadet → Armarouge is planned although two
       Armarouge are owned. Fix: trust a branch as new only when the "Seen" list or a detail-page

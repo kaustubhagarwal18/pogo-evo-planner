@@ -59,8 +59,11 @@ Every later session: open a terminal, `cd` into the project folder and run
 The game already knows most of the answer. Capture three things:
 
 1. **`evolvenew`**: in your Pokémon storage, search `evolvenew` and screen-record yourself
-   scrolling through the results. They're the Pokémon whose evolution would be a new Pokédex
-   entry, including ones you can't afford yet, and those listed only for a Mega Evolution.
+   scrolling through the results, or take screenshots as you scroll. They're the Pokémon whose
+   evolution would be a new Pokédex entry, including ones you can't afford yet, and those listed
+   only for a Mega Evolution. With screenshots, scroll less than a screen each time so the last
+   row or two show again at the top of the next one: the floating buttons hide the names in the
+   bottom row.
 2. **The Pokédex, filtered to Seen**: screenshot the list. Those are species you've seen but
    never caught.
 3. **Your item bag**, showing Rare Candy (or pass `--rare-candy N` instead).
@@ -71,10 +74,16 @@ kept out of git), then:
 ```bash
 pogo-evo-planner evolvenew captures/evolvenew.mp4 captures/seen1.png captures/seen2.png \
     captures/seen3.png captures/bag.png
+
+# or with screenshots of the results instead of the recording
+pogo-evo-planner evolvenew captures/results*.png captures/seen*.png captures/bag.png
 ```
 
-Reading a 30-second recording takes about 3 minutes. The tool then tells you which species
-you're missing (a real run, shortened):
+Reading a 30-second recording takes about 3 minutes; 28 screenshots of the same results took about a
+minute. The grid shows how many Pokémon the search found ("(210)" under the POKÉMON tab), and the
+tool checks it read them all: "Read all 210 Pokémon your search found", or a warning such as "read
+204 of the 210" when screenshots skipped rows; take more screenshots that overlap, or record the
+scroll. Next it tells you which species you're missing (a real run, shortened):
 
 ```
 You're missing 36 species.
@@ -273,7 +282,8 @@ What each screen provides:
   cell). Read for single-evolution species; "evolve" in hint text and MEGA EVOLVE buttons are
   ignored. Checked against 39 real buttons in `tests/real/evolve_buttons/`.
 - **Storage grid** → owned species and CP per cell. A cell whose CP is scrolled off is
-  skipped; another frame will have it whole.
+  skipped; another frame will have it whole. After a search, the count under the POKÉMON tab
+  ("(210)") is read too, and the scan warns when fewer Pokémon than that were read.
 - **Pokédex** → filtered to **Seen** (the filter button in the game's Pokédex), every entry
   shown is a species you've seen but never caught, saved under `not_caught`. Screenshots of
   that list are the quickest way to get a never-caught list. Unfiltered, caught vs. only-seen
