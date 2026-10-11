@@ -82,6 +82,7 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     with_cp: set[tuple[str, int]] = set()
     no_cp: Counter = Counter()
     seen: set[str] = set()
+    shown: set[str] = set()             # Pokémon whose own detail page was captured: you own one
     caught_votes: Counter = Counter()   # frames showing the species as caught (colour sprite, storage...)
     never_votes: Counter = Counter()    # frames showing it as never caught (silhouette, "Seen" list)
     for r, when in zip(results, times):
@@ -97,6 +98,8 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
                 with_cp.add((sp, cp))
         for sp, n in frame_no_cp.items():  # can't de-duplicate across frames without CP
             no_cp[sp] = max(no_cp[sp], n)
+        if r.kind == "detail" and r.species:
+            shown.add(r.species)
         caught_votes.update(r.dex_caught)
         seen |= r.dex_seen_only
         never_votes.update(r.dex_not_caught)
@@ -116,6 +119,9 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     covered = Counter(sp for sp, _ in with_cp)
     for sp, n in sorted(no_cp.items()):
         pokemon += [{"species": sp, "cp": None, "label": "CP ?"}] * max(0, n - covered[sp])
+    # a detail page proves you own that Pokémon, even when the storage grid wasn't captured
+    listed = {p["species"] for p in pokemon}
+    pokemon += [{"species": sp, "cp": None, "label": "detail page"} for sp in sorted(shown - listed)]
 
     return {
         "rare_candy": rare_candy,

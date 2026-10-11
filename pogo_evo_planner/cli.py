@@ -22,6 +22,7 @@ from .inventory import Inventory, load_inventory
 from .planner import Plan, Settings, plan
 
 DATA = Path(__file__).resolve().parent / "data"
+LATEST = Path("data/latest.json")  # written by `make gamemaster`, relative to where you run the tool
 
 
 def _title(s: str) -> str:
@@ -68,8 +69,9 @@ def render(p: Plan) -> str:
 
 def _add_data_args(ap: argparse.ArgumentParser) -> None:
     """Add the --species option shared by every subcommand."""
-    ap.add_argument("--species", default=DATA / "species_sample.json",
-                    help="PokeMiners latest.json or a normalized species table (default: bundled sample)")
+    ap.add_argument("--species", default=LATEST if LATEST.exists() else DATA / "species_sample.json",
+                    help="PokeMiners latest.json or a normalized species table "
+                         "(default: data/latest.json from `make gamemaster`, else a small bundled sample)")
 
 
 def _add_plan_args(ap: argparse.ArgumentParser) -> None:
@@ -87,7 +89,8 @@ def _make_plan(a, species: dict, inventory_path: str | Path) -> tuple[Plan, Inve
     tiers = json.loads(Path(a.tiers).read_text(encoding="utf-8"))
     inv = load_inventory(inventory_path, getattr(a, "pokemon_csv", None))
     result = plan(species, tiers, inv, Settings(dex_bonus=a.dex_bonus, repeat_value=a.repeat_value,
-                                                 allow_trade_evolutions=a.allow_trade_evos))
+                                                 allow_trade_evolutions=a.allow_trade_evos,
+                                                 new_entries_only=getattr(a, "new_entries_only", False)))
     return result, inv
 
 
@@ -116,6 +119,51 @@ def cmd_plan(a) -> None:
 def cmd_dashboard(a) -> None:
     """Handle `pogo-evo-planner dashboard`."""
     _write_dashboard(a, load_species(a.species), a.inventory, a.output, str(a.inventory))
+
+
+def cmd_evolvenew(a) -> None:
+    """Handle `pogo-evo-planner evolvenew`: read the detail pages of the Pokémon the game's `evolvenew`
+    search lists, then print what to evolve and where Rare Candy goes."""
+    from .evolvenew import apply_evolvenew, candy_overrides, item_overrides
+    from .evolvenew import render as render_evolvenew
+    from .scan.pipeline import scan
+
+    species = load_species(a.species)
+    try:
+        candy = candy_overrides(a.candy, species)
+        items = item_overrides(a.item, species)
+    except ValueError as e:
+        sys.exit(f"error: {e}")
+
+    def progress(i, n, label, kind):
+        """Overwrite one stderr line with the frame being read."""
+        print(f"\r  [{i}/{n}] {label}: {kind:<8}", end="", file=sys.stderr, flush=True)
+
+    try:
+        inv, report = scan(a.files, species, backend=a.ocr, fps=a.fps, progress=None if a.quiet else progress)
+    except ValueError as e:
+        sys.exit(f"error: {e}")
+    if not a.quiet:
+        print(file=sys.stderr)
+    inv["candy"].update(candy)   # counts typed on the command line win over what was read
+    inv["items"].update(items)
+    if a.rare_candy is not None:
+        inv["rare_candy"] = a.rare_candy
+    elif not report.screens["bag"]:
+        sys.exit("error: no Rare Candy count: add --rare-candy N, or a screenshot of your item bag")
+    inv, listing = apply_evolvenew(inv, species)
+    Path(a.output).write_text(json.dumps(inv, indent=2) + "\n", encoding="utf-8")
+
+    shown = sorted({p["species"] for p in inv["pokemon"]})
+    print(f"Read {len(shown)} Pokémon: {', '.join(s.replace('_', ' ').title() for s in shown)}", file=sys.stderr)
+    for w in report.warnings:   # the plan below covers missing candy and Rare Candy itself
+        if not w.startswith(("no candy count for", "no item bag screen")):
+            print(f"  ! {w}", file=sys.stderr)
+    print(f"Saved -> {a.output} (fix a misread count with --candy NAME=N)\n", file=sys.stderr)
+    result, plan_inv = _make_plan(a, species, a.output)
+    print(render_evolvenew(result, plan_inv, species, listing), end="")
+    if a.dashboard:
+        _write_dashboard(a, species, a.output, a.dashboard, ", ".join(Path(f).name for f in a.files))
 
 
 def cmd_scan(a) -> None:
@@ -172,6 +220,27 @@ def build_parser() -> argparse.ArgumentParser:
     _add_plan_args(d)
     d.set_defaults(func=cmd_dashboard)
 
+    e = sub.add_parser("evolvenew", help="plan from the Pokémon the game's `evolvenew` search lists (quickest)",
+                       description="In Pokémon GO, search `evolvenew` in your Pokémon storage, then screenshot "
+                                   "each listed Pokémon's page (or record yourself swiping through them). Pass "
+                                   "those files and your Rare Candy count.")
+    e.add_argument("files", nargs="+", help="detail-page screenshots and/or a recording, optionally the item bag")
+    e.add_argument("--rare-candy", type=int, help="your Rare Candy count (instead of a bag screenshot)")
+    e.add_argument("--candy", action="append", default=[], metavar="NAME=N",
+                   help="set or fix a candy count, e.g. --candy NACLI=72 or --candy Naclstack=72 (repeatable)")
+    e.add_argument("--item", action="append", default=[], metavar="NAME=N",
+                   help='evolution items you hold, e.g. --item "Tart Apple=26" --item "Metal Coat=1" (repeatable)')
+    e.add_argument("-o", "--output", default="evolvenew.json", help="where to save what was read")
+    e.add_argument("--ocr", choices=["auto", "rapidocr", "tesseract", "llm", "ollama", "claude"], default="auto",
+                   help="screen reader (default: OCR)")
+    e.add_argument("--fps", type=float, default=3.0, help="frames per second sampled from recordings")
+    e.add_argument("--dashboard", metavar="HTML", help="also write the plan as an HTML dashboard")
+    e.add_argument("--open", action="store_true", help="open the dashboard in a browser")
+    e.add_argument("-q", "--quiet", action="store_true")
+    _add_data_args(e)
+    _add_plan_args(e)
+    e.set_defaults(func=cmd_evolvenew, new_entries_only=True)
+
     s = sub.add_parser("scan", help="OCR screenshots / screen recordings into an inventory JSON")
     s.add_argument("files", nargs="+", help="screenshots (.png/.jpg) and/or recordings (.mp4/.mov)")
     s.add_argument("-o", "--output", default="inventory.json")
@@ -196,7 +265,7 @@ def main(argv: list[str] | None = None) -> None:
     """Parse arguments and run the chosen subcommand."""
     argv = sys.argv[1:] if argv is None else argv
     # backwards compatible: `pogo-evo-planner inventory.json` == `pogo-evo-planner plan inventory.json`
-    if argv and argv[0] not in ("plan", "scan", "dashboard", "-h", "--help"):
+    if argv and argv[0] not in ("plan", "scan", "dashboard", "evolvenew", "-h", "--help"):
         argv = ["plan", *argv]
     a = build_parser().parse_args(argv)
     a.func(a)

@@ -34,25 +34,77 @@ python3.14 -m venv .venv    # any Python >= 3.10
 source .venv/bin/activate
 ```
 
-Then:
+Then, once:
 
 ```bash
 make install-ocr        # pip install -e '.[ocr,dev]'  (RapidOCR + RapidFuzz)
-make gamemaster         # latest datamined game data -> data/latest.json
+make gamemaster         # latest datamined game data -> data/latest.json (used automatically)
+```
 
-pogo-evo-planner scan bag.png recording.mp4 -o inventory.json --species data/latest.json
+### The quick way: `evolvenew`
+
+The game can already list the Pokémon whose evolution would be a new Pokédex entry: search
+`evolvenew` in your Pokémon storage. It includes ones you can't afford yet. So:
+
+1. In Pokémon GO, search `evolvenew`, tap the first Pokémon, and screenshot its page. Swipe to
+   the next and repeat (or screen-record yourself swiping through, about a second each).
+   Each page shows the Pokémon, its CP and its family's candy. Pokémon with several evolutions
+   (Applin, Eevee) take one branch each, so include a page for each copy you'd evolve.
+2. Run:
+
+```bash
+pogo-evo-planner evolvenew screenshots/*.png --rare-candy 305
+```
+
+```
+Rare Candy: 110 of 305 used
+
+Evolve now with your own candy:
+  Floette → Florges Red (needs an evolution quest)
+
+Use Rare Candy:
+  Larvesta → Volcarona  +102 Rare Candy
+  Drakloak → Dragapult  +8 Rare Candy
+
+Not yet:
+  Applin → Appletun: needs Sweet Apple: if you have one, add --item "Sweet Apple=N"
+  Applin → Flapple: needs Tart Apple: if you have one, add --item "Tart Apple=N"
+  Applin → Dipplin: needs Syrupy Apple: if you have one, add --item "Syrupy Apple=N"
+  Snom → Frosmoth: 298 candy short (have 102 of 400) (evolve at night; needs an evolution quest)
+
+Mega Evolution only (needs Mega Energy, not planned):
+  Gardevoir
+
+Already caught according to the Evolve button (not new):
+  Houndstone
+```
+
+That's a real run on seven detail-page screenshots. The last line is a cross-check: Greavard's
+page was included, but its Evolve button shows Houndstone in colour, so it isn't planned.
+
+Instead of `--rare-candy`, include a screenshot of your item bag. Fix a misread count with
+`--candy Naclstack=72` (a Pokémon's name or its family's), and add evolution items with
+`--item "Tart Apple=26"`. What was read is saved to `evolvenew.json`; `--dashboard plan.html`
+also writes the HTML dashboard. Only evolutions into species you've never caught are planned.
+
+### The full scan
+
+To plan from your whole collection instead (including species you caught once but no longer own):
+
+```bash
+pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
 # review inventory.json, add evolution items under "items", then:
-pogo-evo-planner plan inventory.json --species data/latest.json
+pogo-evo-planner plan inventory.json
 
 # same plan as a self-contained HTML page (ranking, candy budget, paths, inventory):
-pogo-evo-planner dashboard inventory.json --species data/latest.json -o dashboard.html --open
+pogo-evo-planner dashboard inventory.json -o dashboard.html --open
 ```
 
 `pogo-evo-planner scan ... --dashboard dashboard.html` scans and writes the dashboard in one go.
 
-Always pass `--species data/latest.json` when scanning. Without it the scanner matches names
-against the small bundled sample, and every species missing from it (all of Paldea, for
-example) is silently dropped.
+Every command uses `data/latest.json` when it exists (run them from the project folder);
+without it they fall back to a small bundled sample, and every species missing from it (all of
+Paldea, for example) is silently dropped. `--species` picks another file.
 
 Scanning took about 1.5 s per frame with RapidOCR on an Apple Silicon laptop. A recording is sampled at
 3 fps, so a few minutes of scrolling can take 10+ minutes to scan. `--fps 1` is about three times

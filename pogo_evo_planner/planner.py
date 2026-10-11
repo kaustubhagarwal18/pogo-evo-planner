@@ -100,6 +100,7 @@ class Settings:
     dex_bonus: float = 20.0          # km-equivalent value of a new Pokédex entry
     repeat_value: float = 0.0        # share of value kept by an evolution into a species you already own
     allow_trade_evolutions: bool = False  # spend candy on evolutions that are free via trade
+    new_entries_only: bool = False   # only plan evolutions into species never caught (`evolvenew`)
     rare_candy_blocked_families: frozenset = frozenset()
 
 
@@ -264,7 +265,8 @@ def family_options(family: str, specimens: list[Specimen], species: dict, inv: I
                 # a repeat (a species you already have) may only use your own candy, never Rare Candy
                 if rep + p.candy <= own_candy:
                     moves.append((base + p.candy * cpc * settings.repeat_value, rep + p.candy, firsts))
-                if final and final not in owned and final not in firsts:
+                if final and final not in owned and final not in firsts \
+                        and not (settings.new_entries_only and final in registered):
                     # a new species is worth the same however it is reached, so the cheapest route wins
                     moves.append((base + from_base.get(final, p.candy) * cpc, rep, firsts | {final}))
                 for v, r, f in moves:

@@ -13,4 +13,5 @@ data/*.tmp
 mock/
 captures/
 /inventory*.json
+/evolvenew*.json
 /dashboard.html

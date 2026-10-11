@@ -39,6 +39,38 @@ _CONDITION_NOTES = {
 }
 
 
+# what players call the evolution items the game master names internally
+ITEM_NAMES = {
+    "ITEM_GEN4_EVOLUTION_STONE": "Sinnoh Stone",
+    "ITEM_GEN5_EVOLUTION_STONE": "Unova Stone",
+    "ITEM_OTHER_EVOLUTION_STONE_A": "Linking Cord",
+    "ITEM_OTHER_EVOLUTION_STONE_MAPLE_A": "Sweet Apple",
+    "ITEM_OTHER_EVOLUTION_STONE_MAPLE_B": "Tart Apple",
+    "ITEM_OTHER_EVOLUTION_STONE_MAPLE_C": "Syrupy Apple",
+    "ITEM_TROY_DISK_GLACIAL": "Glacial Lure Module",
+    "ITEM_TROY_DISK_MAGNETIC": "Magnetic Lure Module",
+    "ITEM_TROY_DISK_MOSSY": "Mossy Lure Module",
+    "ITEM_TROY_DISK_RAINY": "Rainy Lure Module",
+    "ITEM_KINGS_ROCK": "King's Rock",
+    "ITEM_UP_GRADE": "Up-Grade",
+}
+
+
+def item_name(item: str) -> str:
+    """An item id as players know it: ITEM_GEN4_EVOLUTION_STONE -> Sinnoh Stone, ITEM_METAL_COAT -> Metal Coat."""
+    return ITEM_NAMES.get(item) or item.removeprefix("ITEM_").replace("_", " ").title()
+
+
+def item_id(name: str, known: set[str]) -> str | None:
+    """The item id for a player's name of it ("Tart Apple", "metal coat") or an id; None if unknown."""
+    key = name.strip().upper().replace(" ", "_").replace("-", "_").replace("'", "")
+    for item in known:
+        if key in (item, item.removeprefix("ITEM_")) or key == item_name(item).upper().replace(" ", "_")\
+                .replace("-", "_").replace("'", ""):
+            return item
+    return None
+
+
 def _species_key(ps: dict) -> str:
     """Species id for a game master entry: the form name for regional/alternate forms, else the Pokémon id."""
     form = ps.get("form")

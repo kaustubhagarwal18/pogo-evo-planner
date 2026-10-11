@@ -1,5 +1,16 @@
 # What to capture
 
+## The quick way: `evolvenew`
+
+In your Pokémon storage, search `evolvenew`: the game lists every Pokémon whose evolution
+would be a new Pokédex entry, including ones you can't afford yet. Tap the first one and
+screenshot its page, then swipe to the next and repeat (or screen-record yourself swiping
+through, pausing about a second on each). For a Pokémon with several evolutions (Applin,
+Eevee), include a page for each copy you'd evolve. Then run
+`pogo-evo-planner evolvenew <files> --rare-candy N`.
+
+## The full scan
+
 Two inputs. Both can come from any phone's built-in screenshot and screen-recording tools.
 
 ## 1. Item bag screenshot

@@ -63,6 +63,17 @@ Next from that recording:
 - [ ] Regional forms (Alolan, Galarian…) in names and the species table
 - [ ] Non-English game languages (OCR language + localised species names)
 
+### The `evolvenew` flow
+
+- [x] `pogo-evo-planner evolvenew`: detail pages of the Pokémon the game's `evolvenew` search
+      lists, plus a Rare Candy count, give the plan in plain words (evolve now, use Rare Candy,
+      not yet, Mega only). Detail pages count as owned, one copy per CP; only evolutions into
+      never-caught species are planned; `--candy` / `--item` fix or add counts. Tried on 7 real
+      detail screenshots
+- [ ] Try a real swipe-through recording of the `evolvenew` results (does swiping on the detail
+      page stay inside the search results?)
+- [ ] Read evolution items (apples, stones) from the bag screenshot instead of `--item`
+
 ### LLM screen readers
 
 - [x] `--ocr llm` / `ollama` (local, free; default LLM) and `--ocr claude` (paid API) read frames

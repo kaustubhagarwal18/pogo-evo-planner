@@ -76,6 +76,7 @@ class SpeciesMatcher:
 @dataclass
 class ScreenResult:
     kind: str
+    species: str | None = None                                   # detail: the Pokémon the page shows
     rare_candy: int | None = None
     candy: dict[str, int] = field(default_factory=dict)          # family -> count
     specimens: list[tuple[str, int | None]] = field(default_factory=list)  # (species, cp)
@@ -262,11 +263,13 @@ def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
     With the image, also reads whether the evolution on the EVOLVE button has ever been caught.
     Only species with a single evolution are read, since branched ones show several buttons.
     """
-    r = ScreenResult("detail")
+    r = ScreenResult("detail", species=_screen_species(words, m))
+    cp = _detail_cp(words)
+    if r.species and cp is not None:
+        r.specimens.append((r.species, cp))   # each Pokémon swiped past is its own copy; frames share its CP
     evolves = evolve_buttons(words)
-    sp = _screen_species(words, m) if img is not None and len(evolves) == 1 else None
-    evos = species.get(sp, {}).get("evolutions", []) if sp else []
-    if len(evos) == 1 and img is not None:
+    evos = species.get(r.species, {}).get("evolutions", []) if r.species else []
+    if len(evos) == 1 and len(evolves) == 1 and img is not None:
         caught = evolve_sprite_caught(img, evolves[0])
         if caught is not None:
             (r.dex_caught if caught else r.dex_not_caught).add(evos[0]["to"])
@@ -287,6 +290,20 @@ def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
             else:
                 r.notes.append(f"{sp} candy label found but no count above it")
     return r
+
+
+def _detail_cp(words: list[Word]) -> int | None:
+    """The CP printed in large type at the top of a detail page ("CP291", or "CP" and "291"); None when
+    it isn't on screen (the page is scrolled down)."""
+    found = []
+    for line in _lines(words):
+        for i, w in enumerate(line):
+            j = _CP_JOINED.match(norm(w.text))
+            if j:
+                found.append((w.h, int(j.group(1))))
+            elif norm(w.text) == "CP" and i + 1 < len(line) and (n := parse_int(line[i + 1].text)) is not None:
+                found.append((w.h, n))
+    return max(found)[1] if found else None   # the largest: move names and costs are smaller
 
 
 def _candy_label(words: list[Word], line: list[Word], i: int, m: SpeciesMatcher) -> tuple[str, list[Word]] | None:
