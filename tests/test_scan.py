@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -10,11 +11,12 @@ import numpy as np
 from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.scan.frames import extract_frames
 from pogo_evo_planner.scan.ocr import Word, _split_line, available_backend
-from pogo_evo_planner.scan.pipeline import ScanReport, merge, scan
+from pogo_evo_planner.scan.pipeline import ScanReport, merge, scan, taken_at
 from pogo_evo_planner.scan.screens import (
     ScreenResult,
     SpeciesMatcher,
     classify,
+    evolve_buttons,
     evolve_sprite_caught,
     parse_bag,
     parse_detail,
@@ -86,12 +88,38 @@ class ParserTests(unittest.TestCase):
         self.assertFalse(evolve_sprite_caught(*evolve_button("silhouette")))
         self.assertTrue(evolve_sprite_caught(*evolve_button("dark")))  # real Kilowattrel misread before
 
-    def test_evolve_button_grey_is_unknown(self):
-        # the button greys out when the evolution is unaffordable; the sprite stays as it was
-        img, ev = evolve_button("silhouette")
-        button = np.all(img == img[980, 300], axis=2)
-        img[button] = (215, 218, 220)
-        self.assertIsNone(evolve_sprite_caught(img, ev))
+    def test_evolve_button_colour_does_not_matter(self):
+        # buttons come grey, pink or blue-grey as well as green; the sprite alone decides
+        for sprite, expected in (("silhouette", False), ("colour", True)):
+            img, ev = evolve_button(sprite)
+            button = np.all(img == img[980, 300], axis=2)
+            img[button] = (215, 218, 220)
+            if sprite == "silhouette":   # a darker shade of the grey button
+                img[np.all(img == img[1016, 100], axis=2)] = (120, 122, 124)
+            self.assertIs(evolve_sprite_caught(img, ev), expected)
+
+    def test_evolve_button_on_real_screens(self):
+        # 39 buttons from a real recording and real screenshots, each checked by eye: 22 in colour,
+        # 11 silhouettes (on green, pink and blue-grey buttons), and 6 frames where the sprite hadn't
+        # loaded yet, which used to read as caught (how Dragapult was wrongly marked caught)
+        folder = Path(__file__).resolve().parent / "real" / "evolve_buttons"
+        cases = json.loads((folder / "cases.json").read_text())
+        answer = {True: "caught", False: "never caught", None: "unknown"}
+        wrong = {}
+        for name, case in cases.items():
+            got = answer[evolve_sprite_caught(cv2.imread(str(folder / f"{name}.png")),
+                                              Word("EVOLVE", *case["label_box"], 0.9))]
+            if got != case["expected"]:
+                wrong[name] = f"{got}, expected {case['expected']}"
+        self.assertEqual(wrong, {})
+
+    def test_evolve_buttons_skip_hint_text_and_mega(self):
+        button = w("EVOLVE", 270, 1890)
+        hint = [w("Adventure", 180, 2040), w("together", 420, 2040), w("to", 600, 2040), w("evolve", 650, 2040)]
+        mega = [w("MEGA", 270, 1680), w("EVOLVE", 270, 1730)]   # stacked on two lines
+        self.assertEqual(evolve_buttons([button] + hint), [button])
+        self.assertEqual(evolve_buttons(mega), [])
+        self.assertEqual(evolve_buttons([w("MEGA", 150, 1700), w("EVOLVE", 270, 1700)]), [])
 
     def test_detail_reads_evolution_never_caught_from_silhouette(self):
         img, ev = evolve_button("silhouette")
@@ -109,6 +137,16 @@ class ParserTests(unittest.TestCase):
                  w("EVOLVE", 450, 1760)]
         self.assertEqual(parse_detail(words, M, SPECIES).candy, {"DRATINI": 60})
 
+    def test_detail_reads_candy_label_wrapped_onto_two_lines(self):
+        # real Greavard page: "GREAVARD" above "CANDY"; the Candy XL label wraps the same way
+        words = [Word("9,176,980", 116, 1480, 260, 57, 0.9), Word("77", 533, 1480, 50, 53, 0.9),
+                 Word("19", 865, 1480, 50, 54, 0.9), Word("STARDUST", 151, 1548, 190, 32, 0.9),
+                 Word("GREAVARD", 480, 1548, 190, 32, 0.9), Word("GREAVARD", 811, 1550, 190, 32, 0.9),
+                 Word("CANDY", 511, 1584, 120, 34, 0.9), Word("CANDY", 819, 1585, 110, 32, 0.9),
+                 Word("XL", 941, 1585, 40, 32, 0.9)]
+        species = {**SPECIES, "GREAVARD": {"dex": 971, "family": "GREAVARD", "buddy_km": 3}}
+        self.assertEqual(parse_detail(words, SpeciesMatcher(species), species).candy, {"GREAVARD": 77})
+
     def test_storage_pairs_cp_in_same_cell(self):
         words = [w("CP", 92, 146), w("412", 176, 146), w("CP", 436, 145), w("1543", 523, 145),
                  w("Dratini", 95, 436, 160), w("Dragonair", 415, 436, 220)]
@@ -125,6 +163,53 @@ class ParserTests(unittest.TestCase):
         words = [w("#0147", 90, 320, 120), w("#0149", 390, 320, 120)]
         r = parse_pokedex(words, img, M)
         self.assertEqual((r.dex_caught, r.dex_seen_only), ({"DRATINI"}, {"DRAGONITE"}))
+
+    def test_pokedex_seen_filter_lists_never_caught(self):
+        # real "Seen" screen: the status bar's battery (60) and "Caught: 893" are not dex numbers
+        words = [Word("11:48", 80, 41, 90, 38, 0.9), Word("60", 928, 43, 40, 37, 0.9),
+                 Word("POKÉDEX", 45, 127, 190, 53, 0.9), Word("Caught:", 750, 133, 150, 52, 0.9),
+                 Word("893", 929, 133, 70, 52, 0.9), Word("Seen", 248, 263, 90, 51, 0.9),
+                 Word("0147", 100, 865, 110, 51, 0.9), Word("0148", 351, 864, 110, 52, 0.9)]
+        r = parse_pokedex(words, None, M)
+        self.assertEqual((r.dex_not_caught, r.dex_caught, r.dex_seen_only), ({"DRATINI", "DRAGONAIR"}, set(), set()))
+        # unfiltered, the same header numbers are still ignored
+        r = parse_pokedex([x for x in words if x.text != "Seen"], None, M)
+        self.assertEqual(r.dex_caught, {"DRATINI", "DRAGONAIR"})
+
+    def test_merge_prefers_the_newest_capture(self):
+        # Snom: an older recording read 80 three times, today's screenshot reads 102
+        frames = [ScreenResult("detail", candy={"SNOM": 80})] * 3 + [ScreenResult("detail", candy={"SNOM": 102}),
+                                                                     ScreenResult("bag", rare_candy=300),
+                                                                     ScreenResult("bag", rare_candy=305)]
+        rep = ScanReport()
+        inv = merge(frames, rep, times=[1.0, 1.0, 1.0, 2.0, 1.0, 2.0])
+        self.assertEqual((inv["candy"], inv["rare_candy"]), ({"SNOM": 102}, 305))
+        self.assertTrue(any("using 102, from the newest capture" in x for x in rep.warnings))
+        # within one capture the most common reading still outvotes a misread frame
+        newest = [ScreenResult("detail", candy={"SNOM": 102})] * 2 + [ScreenResult("detail", candy={"SNOM": 162})]
+        self.assertEqual(merge(newest, ScanReport(), times=[2.0, 2.0, 2.0])["candy"], {"SNOM": 102})
+
+    def test_taken_at_reads_the_file_name(self):
+        # file names carry the phone's local time, with no time zone
+        self.assertEqual(taken_at("Screenshot_20261011-115015.png"),
+                         datetime(2026, 10, 11, 11, 50, 15).timestamp())  # noqa: DTZ001
+        self.assertEqual(taken_at("VID_20261004_225901.mp4"),
+                         datetime(2026, 10, 4, 22, 59, 1).timestamp())  # noqa: DTZ001
+        with tempfile.TemporaryDirectory() as d:   # no date in the name: when the file was last modified
+            f = Path(d) / "bag.png"
+            f.write_bytes(b"")
+            os.utime(f, (1_000_000, 1_000_000))
+            self.assertEqual(taken_at(f), 1_000_000)
+
+    def test_merge_majority_decides_caught(self):
+        frames = [ScreenResult("detail", dex_caught={"DRAGAPULT"}),        # one bad frame
+                  ScreenResult("detail", dex_not_caught={"DRAGAPULT"}),
+                  ScreenResult("pokedex", dex_not_caught={"DRAGAPULT"}),   # "Seen" list
+                  ScreenResult("detail", dex_caught={"PAWMO"}), ScreenResult("detail", dex_not_caught={"PAWMO"})]
+        rep = ScanReport()
+        inv = merge(frames, rep)
+        self.assertEqual((inv["not_caught"], inv["pokedex"]), (["DRAGAPULT"], []))
+        self.assertTrue(any(x.startswith("PAWMO:") for x in rep.warnings))   # a tie decides nothing
 
     def test_merge_votes_and_dedupes(self):
         a = ScreenResult("storage", specimens=[("DRATINI", 412), ("EEVEE", None), ("EEVEE", None)])

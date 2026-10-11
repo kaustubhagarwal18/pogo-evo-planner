@@ -138,18 +138,23 @@ What each screen provides:
 - **Pokémon detail page** → that family's candy (`60` above `DRATINI CANDY`). Neither the
   storage grid nor the Pokédex shows candy, so one detail page per family is needed. The
   Candy XL count beside it is ignored, including on narrow phones where its label wraps
-  onto two lines. The **Evolve button** also shows whether you've ever caught the evolution:
-  a dark silhouette means never caught, colour means caught. A silhouette is saved under
-  `not_caught` and overrides a storage reading of that species (the grid sometimes pairs a
-  name with the wrong cell). A species counts as caught if any frame shows it in colour, so
-  one misread frame (a green Pokémon on the green button, a sprite caught mid-swipe) is
-  outvoted. Read for single-evolution species on green buttons; the grey button shown when you
-  can't afford it is reported as unknown for now.
+  onto two lines, and a candy label whose long name wraps ("GREAVARD" above "CANDY"). The
+  **Evolve button** also shows whether you've ever caught the evolution: a flat dark
+  silhouette means never caught, a Pokémon in colour means caught. The button's own colour
+  (green, grey, pink, blue-grey) doesn't matter; the sprite is judged against it. A frame
+  where the sprite hasn't loaded yet is left out, and each species is decided by a majority of
+  frames, so one misread frame doesn't decide. A silhouette is saved under `not_caught` and
+  overrides a storage reading of that species (the grid sometimes pairs a name with the wrong
+  cell). Read for single-evolution species; "evolve" in hint text and MEGA EVOLVE buttons are
+  ignored. Checked against 39 real buttons in `tests/real/evolve_buttons/`.
 - **Storage grid** → owned species and CP per cell. A cell whose CP is scrolled off is
   skipped; another frame will have it whole.
-- **Pokédex** → caught vs. only-seen, by sprite colour above the dex number. Not yet tried on
-  a real Pokédex recording. Next iteration: apply the Evolve button's silhouette test to a
-  Pokédex scroll to get never-caught for every species at once (see the roadmap).
+- **Pokédex** → filtered to **Seen** (the filter button in the game's Pokédex), every entry
+  shown is a species you've seen but never caught, saved under `not_caught`. Screenshots of
+  that list are the quickest way to get a never-caught list. Unfiltered, caught vs. only-seen
+  is guessed from sprite colour (not yet tried on real screens). The status bar and the
+  "Caught: N" count are not read as dex numbers. Species you've never even seen aren't on the
+  "Seen" list, so the Evolve button is still needed for those.
 
 ### Reading screens with an LLM (optional, `pogo_evo_planner/scan/llm.py`)
 

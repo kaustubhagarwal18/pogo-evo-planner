@@ -27,32 +27,25 @@ Done from the first real recording (576×1296 phone screen, Paldea-heavy storage
       never caught, in colour if it was. A silhouette overrides a storage reading of that species.
       Checked on every detail frame of the recording: the 4 never-caught results (Espathra,
       Garganacl, Glimmora, Toedscruel) are real silhouettes. A dark-bodied sprite (Kilowattrel)
-      was misread as a silhouette and is fixed (silhouettes are never near-black). A species
-      counts as caught if any frame shows it in colour, which outvotes single-frame misreads
+      was misread as a silhouette and is fixed (silhouettes are never near-black)
+- [x] Evolve-button check rebuilt on 39 real buttons (`tests/real/evolve_buttons/`): the sprite is
+      judged against its button whatever the button's colour (grey, pink and blue-grey buttons were
+      "unknown" before); frames where the sprite hasn't loaded are skipped (they read as "caught",
+      which is how Dragapult was wrongly marked caught); each species is decided by a majority of
+      frames; hint text ("…to evolve") and MEGA EVOLVE buttons are ignored
+- [x] Pokédex filtered to "Seen": every entry is never caught. Tried on real screenshots; the
+      status bar and the "Caught: N" count are no longer read as dex numbers
+- [x] Candy label whose name wraps onto its own line ("GREAVARD" above "CANDY") is read
 
 Next from that recording:
 
-- [ ] **Pokédex recording with the silhouette test (next iteration).** Record a scroll through the
-      Pokédex and read caught vs. never-caught for every species at once, with the same
-      sprite-vs-background test the Evolve button uses. That gives a full "never caught" list
-      without opening one detail page per family, and cross-checks every storage reading.
-      `parse_pokedex` already guesses this from sprite saturation, but it has never seen a real
-      Pokédex screen.
-- [ ] Grey Evolve button (shown when the evolution is unaffordable): calibrate the silhouette
-      test for it; it's reported as unknown for now
-- [ ] Evolve-button misreads still possible on a single frame: a mostly green Pokémon on the green
-      button (Floragato read as a silhouette once), and frames caught mid-swipe while the sprite
-      is still fading in (Pawmo). Both were outvoted by other frames here; a green species seen on
-      only one frame could still slip through. Ideas: skip frames where the sprite is unusually
-      small, and require two frames to agree on "never caught"
-- [ ] The opposite misread: Dragapult was read as **caught** (colour on the Evolve button) although
-      the player never caught one; it had to be removed from the Pokédex list by hand. Because one
-      colour frame outvotes any number of silhouettes, a false "caught" can't be outvoted. Weigh
-      the votes instead of letting colour always win
+- [ ] Unfiltered Pokédex: caught vs. only-seen from sprite colour has still never seen a real
+      screen; the "Seen" filter covers never-caught, but not species never seen at all
+- [ ] A species seen on only one frame is still decided by that frame; capture each detail page
+      for a second or two
 - [ ] Red candy cost on the Evolve row means "can't afford": use it to sanity-check candy counts
 - [ ] CP-to-name pairing in the storage grid: names get the CP of a neighbouring cell
       (4 Zacian and 3 Zamazenta carrying other Pokémon's CPs, a Kubfu with Kleavor's CP)
-- [ ] Some detail pages read no candy count (Greavard); find out why
 - [ ] End-to-end synthetic test fails with RapidOCR on macOS (RapidOCR 3.9, PP-OCRv6 models:
       Feebas and Chansey candy unread). It passes with Tesseract, and in CI's RapidOCR job on
       Linux. Already failing at the initial commit

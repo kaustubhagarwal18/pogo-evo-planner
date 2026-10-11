@@ -13,7 +13,10 @@ Record these in one go (or several recordings; pass them all to `pogo-evo-planne
 1. **Storage grid.** Open your Pokémon list and scroll slowly from top to bottom.
    Tip: use the in-game search to filter first (e.g. to the families you care about),
    so a few hundred Pokémon becomes a few dozen.
-2. **Pokédex.** Scroll through it once. Optional; it only adds a bonus for new entries.
+2. **Pokédex, filtered to Seen.** Open the Pokédex, tap the filter button, choose **Seen**,
+   and screenshot the list from top to bottom (a few screenshots is usually enough). Every
+   entry there is a species you've seen but never caught. Optional, but it's the most reliable
+   source for never-caught species (the Evolve button covers the ones you've never seen).
 3. **One detail page per family.** Tap any Pokémon of each family you're considering
    and pause about a second on the page, then swipe to the next. The candy count
    (`123` above `DRATINI CANDY`) only appears here.
