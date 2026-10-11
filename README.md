@@ -43,18 +43,45 @@ make gamemaster         # latest datamined game data -> data/latest.json (used a
 
 ### The quick way: `evolvenew`
 
-The game can already list the Pokémon whose evolution would be a new Pokédex entry: search
-`evolvenew` in your Pokémon storage. It includes ones you can't afford yet. So:
+The game already knows most of the answer. Capture three things:
 
-1. In Pokémon GO, search `evolvenew`, tap the first Pokémon, and screenshot its page. Swipe to
-   the next and repeat (or screen-record yourself swiping through, about a second each).
-   Each page shows the Pokémon, its CP and its family's candy. Pokémon with several evolutions
-   (Applin, Eevee) take one branch each, so include a page for each copy you'd evolve.
-2. Run:
+1. **`evolvenew`**: in your Pokémon storage, search `evolvenew` and screen-record yourself
+   scrolling through the results. They're the Pokémon whose evolution would be a new Pokédex
+   entry, including ones you can't afford yet, and those listed only for a Mega Evolution.
+2. **The Pokédex, filtered to Seen**: screenshot the list. Those are species you've seen but
+   never caught.
+3. **Your item bag**, showing Rare Candy (or pass `--rare-candy N` instead).
 
 ```bash
-pogo-evo-planner evolvenew screenshots/*.png --rare-candy 305
+pogo-evo-planner evolvenew evolvenew.mp4 seen1.png seen2.png seen3.png bag.png
 ```
+
+The tool tells you which species you're missing (a real run, shortened):
+
+```
+You're missing 36 species.
+
+Evolve into these (from Pokémon you own):
+  Dragapult                                from Drakloak        100 candy, candy ?
+  Garganacl                                from Naclstack       100 candy, candy ?
+  Kingambit                                from Bisharp         100 candy, candy ? (needs an evolution quest)
+  Urshifu (Rapid Strike or Single Strike)  from Kubfu           200 candy, candy ? (needs an evolution quest)
+  ...
+
+Catch these (seen, but nothing you own evolves into them):
+  Carnivine, Chatot, Comfey, Dhelmise, Gholdengo, Gimmighoul, Hawlucha, ...
+
+Mega Evolution only (54, need Mega Energy, not planned):
+  Abomasnow, Aerodactyl, Aggron, ...
+
+To plan your 305 Rare Candy for the rest, add each family's candy count: screenshot one
+Pokémon's page per family, or use --candy NAME=N:
+  Applin, Bellsprout, Blipbug (e.g. Dottler), Charcadet, Dreepy (e.g. Drakloak), ...
+```
+
+Then add the candy counts, as detail-page screenshots of those families (one each) or as
+`--candy Naclstack=72` (a Pokémon's name or its family's), and run it again. The output then
+continues with the Rare Candy plan:
 
 ```
 Rare Candy: 110 of 305 used
@@ -67,25 +94,14 @@ Use Rare Candy:
   Drakloak → Dragapult  +8 Rare Candy
 
 Not yet:
-  Applin → Appletun: needs Sweet Apple: if you have one, add --item "Sweet Apple=N"
   Applin → Flapple: needs Tart Apple: if you have one, add --item "Tart Apple=N"
-  Applin → Dipplin: needs Syrupy Apple: if you have one, add --item "Syrupy Apple=N"
   Snom → Frosmoth: 298 candy short (have 102 of 400) (evolve at night; needs an evolution quest)
-
-Mega Evolution only (needs Mega Energy, not planned):
-  Gardevoir
-
-Already caught according to the Evolve button (not new):
-  Houndstone
 ```
 
-That's a real run on seven detail-page screenshots. The last line is a cross-check: Greavard's
-page was included, but its Evolve button shows Houndstone in colour, so it isn't planned.
-
-Instead of `--rare-candy`, include a screenshot of your item bag. Fix a misread count with
-`--candy Naclstack=72` (a Pokémon's name or its family's), and add evolution items with
-`--item "Tart Apple=26"`. What was read is saved to `evolvenew.json`; `--dashboard plan.html`
-also writes the HTML dashboard. Only evolutions into species you've never caught are planned.
+Only evolutions into species you've never caught are planned, and Rare Candy is never spent
+on a family whose candy count is unknown. Detail pages count as Pokémon you own, one per CP, so
+include a page for each copy of a Pokémon with several evolutions (Applin, Eevee) you'd evolve.
+Add evolution items with `--item "Tart Apple=26"`. What was read is saved to `evolvenew.json`.
 
 ### The full scan
 

@@ -8,7 +8,14 @@ from pathlib import Path
 from unittest import mock
 
 from pogo_evo_planner import cli
-from pogo_evo_planner.evolvenew import apply_evolvenew, candy_overrides, item_overrides, render
+from pogo_evo_planner.evolvenew import (
+    apply_evolvenew,
+    candy_overrides,
+    item_overrides,
+    missing,
+    render,
+    unknown_candy,
+)
 from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.inventory import Inventory, Specimen, inventory_from_dict
 from pogo_evo_planner.planner import Settings, plan
@@ -52,17 +59,61 @@ class EvolvenewTests(unittest.TestCase):
         self.assertIn("Evolve now with your own candy:\n  Feebas → Milotic (walk 20 km as buddy first)", text)
         self.assertIn("Use Rare Candy:\n  Dragonair → Dragonite  +40 Rare Candy", text)
         self.assertIn("Larvitar → Pupitar: 20 candy short (have 5 of 25)", text)
-        self.assertIn("Mega Evolution only (needs Mega Energy, not planned):\n  Gengar", text)
+        self.assertIn("Mega Evolution only (1, need Mega Energy, not planned):\n  Gengar", text)
+        self.assertRegex(text, r"You're missing 3 species\.\n\nEvolve into these \(from Pokémon you own\):\n"
+                               r"  Dragonite\s+from Dragonair\s+100 candy, have 60")
 
     def test_unknown_candy_and_missing_item_say_what_to_do(self):
         data, listing = apply_evolvenew(scanned("ONIX", "DRATINI"), SPECIES)
         inv = inventory_from_dict(data)
         text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
-        self.assertIn("Dratini → Dragonair: candy count unknown: add a screenshot of its page, or --candy DRATINI=N",
-                      text)
+        self.assertRegex(text, r"  Dragonair\s+from Dratini\s+25 candy, candy \?")
+        self.assertRegex(text, r"  Steelix\s+from Onix\s+50 candy, candy \? \(needs Metal Coat\)")
+        self.assertIn("add each family's candy count: screenshot one Pokémon's page per family, or use "
+                      "--candy NAME=N:\n  Dratini, Onix", text)
         inv.candy["ONIX"] = 100
         text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
         self.assertIn('Onix → Steelix: needs Metal Coat: if you have one, add --item "Metal Coat=N"', text)
+
+    def test_missing_list_from_evolvenew_and_the_seen_list(self):
+        # evolvenew lists Dragonair and Gengar; the Pokédex "Seen" filter adds Gyarados and Machamp
+        data, _ = apply_evolvenew({**scanned("DRAGONAIR", "GENGAR", "MACHOKE"),
+                                   "not_caught": ["GYARADOS", "MACHAMP", "GENGAR"]}, SPECIES)
+        evolve, catch = missing(inventory_from_dict(data), SPECIES)
+        self.assertEqual(evolve, [("DRAGONITE", "DRAGONAIR", 100), ("MACHAMP", "MACHOKE", 100)])
+        self.assertEqual(catch, ["GYARADOS"])     # Gengar is held, so it can't be missing
+
+    def test_forms_of_one_pokedex_entry_are_listed_once(self):
+        species = {
+            "TANDEMAUS": {"dex": 924, "family": "TANDEMAUS", "buddy_km": 1, "evolutions": [
+                {"to": "MAUSHOLD_FAMILY_OF_FOUR", "candy": 50}, {"to": "MAUSHOLD_FAMILY_OF_THREE", "candy": 50}]},
+            "MAUSHOLD": {"dex": 925, "family": "TANDEMAUS", "buddy_km": 1},
+            "MAUSHOLD_FAMILY_OF_FOUR": {"dex": 925, "family": "TANDEMAUS", "buddy_km": 1},
+            "MAUSHOLD_FAMILY_OF_THREE": {"dex": 925, "family": "TANDEMAUS", "buddy_km": 1},
+        }
+        # the "Seen" list names the plain species, evolvenew its forms: one row, not three
+        data, listing = apply_evolvenew({**scanned("TANDEMAUS"), "not_caught": ["MAUSHOLD"]}, species)
+        inv = inventory_from_dict(data)
+        evolve, catch = missing(inv, species)
+        self.assertEqual((len(evolve), catch), (1, []))
+        text = render(plan(species, TIERS, inv, Settings(new_entries_only=True)), inv, species, listing)
+        self.assertIn("Maushold (Family Of Four or Family Of Three)", text)
+
+    def test_unknown_candy_never_gets_rare_candy(self):
+        # Kubfu's candy wasn't read: counting it as 0 spent 200 Rare Candy on a guess
+        data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS", candy={"FEEBAS": 30}, rare=300), SPECIES)
+        inv = inventory_from_dict(data)
+        p = plan(SPECIES, TIERS, inv, Settings(new_entries_only=True,
+                                               rare_candy_blocked_families=unknown_candy(inv, SPECIES)))
+        self.assertEqual([f.family for f in p.families], ["FEEBAS"])
+
+    def test_the_games_list_beats_owning_a_later_stage(self):
+        # owning Dragonite would normally mean Dragonair was caught; evolvenew listing Dratini says otherwise
+        data, _ = apply_evolvenew({**scanned("DRATINI", "DRAGONITE", candy={"DRATINI": 25})}, SPECIES)
+        inv = inventory_from_dict(data)
+        self.assertIn("DRAGONAIR", inv.not_caught)
+        p = plan(SPECIES, TIERS, inv, Settings(new_entries_only=True))
+        self.assertEqual([path.targets for f in p.families for path in f.paths], [["DRAGONAIR"]])
 
     def test_one_copy_of_a_branching_pokemon_takes_one_branch(self):
         data, listing = apply_evolvenew(scanned("KIRLIA", candy={"RALTS": 400}), SPECIES)

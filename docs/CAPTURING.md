@@ -2,12 +2,15 @@
 
 ## The quick way: `evolvenew`
 
-In your Pokémon storage, search `evolvenew`: the game lists every Pokémon whose evolution
-would be a new Pokédex entry, including ones you can't afford yet. Tap the first one and
-screenshot its page, then swipe to the next and repeat (or screen-record yourself swiping
-through, pausing about a second on each). For a Pokémon with several evolutions (Applin,
-Eevee), include a page for each copy you'd evolve. Then run
-`pogo-evo-planner evolvenew <files> --rare-candy N`.
+1. In your Pokémon storage, search `evolvenew` and screen-record yourself scrolling slowly
+   through the results. The game lists every Pokémon whose evolution would be a new Pokédex
+   entry, including ones you can't afford yet.
+2. Open the Pokédex, tap the filter button, choose **Seen**, and screenshot the list.
+3. Screenshot your item bag showing Rare Candy.
+
+Run `pogo-evo-planner evolvenew <files>`. It lists what you're missing and which families'
+candy counts it needs. For those, screenshot one Pokémon's page per family (the candy count is
+only on that page) and run it again with those screenshots added.
 
 ## The full scan
 

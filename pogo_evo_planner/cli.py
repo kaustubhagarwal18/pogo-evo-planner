@@ -90,7 +90,8 @@ def _make_plan(a, species: dict, inventory_path: str | Path) -> tuple[Plan, Inve
     inv = load_inventory(inventory_path, getattr(a, "pokemon_csv", None))
     result = plan(species, tiers, inv, Settings(dex_bonus=a.dex_bonus, repeat_value=a.repeat_value,
                                                  allow_trade_evolutions=a.allow_trade_evos,
-                                                 new_entries_only=getattr(a, "new_entries_only", False)))
+                                                 new_entries_only=getattr(a, "new_entries_only", False),
+                                                 rare_candy_blocked_families=getattr(a, "blocked", frozenset())))
     return result, inv
 
 
@@ -124,7 +125,7 @@ def cmd_dashboard(a) -> None:
 def cmd_evolvenew(a) -> None:
     """Handle `pogo-evo-planner evolvenew`: read the detail pages of the Pokémon the game's `evolvenew`
     search lists, then print what to evolve and where Rare Candy goes."""
-    from .evolvenew import apply_evolvenew, candy_overrides, item_overrides
+    from .evolvenew import apply_evolvenew, candy_overrides, item_overrides, unknown_candy
     from .evolvenew import render as render_evolvenew
     from .scan.pipeline import scan
 
@@ -160,6 +161,7 @@ def cmd_evolvenew(a) -> None:
         if not w.startswith(("no candy count for", "no item bag screen")):
             print(f"  ! {w}", file=sys.stderr)
     print(f"Saved -> {a.output} (fix a misread count with --candy NAME=N)\n", file=sys.stderr)
+    a.blocked = unknown_candy(load_inventory(a.output), species)   # never guess a count as 0 and fill it
     result, plan_inv = _make_plan(a, species, a.output)
     print(render_evolvenew(result, plan_inv, species, listing), end="")
     if a.dashboard:

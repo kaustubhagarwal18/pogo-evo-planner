@@ -36,7 +36,7 @@ def load_images(paths: list[str | Path], fps: float = 3.0) -> list[tuple[str, np
         else:
             img = cv2.imread(str(p))
             if img is None:
-                raise FileNotFoundError(p)
+                raise ValueError(f"can't read {p}: not found, or not an image")
             out.append((p.name, img))
     return out
 

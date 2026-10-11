@@ -265,8 +265,11 @@ def family_options(family: str, specimens: list[Specimen], species: dict, inv: I
                 # a repeat (a species you already have) may only use your own candy, never Rare Candy
                 if rep + p.candy <= own_candy:
                     moves.append((base + p.candy * cpc * settings.repeat_value, rep + p.candy, firsts))
-                if final and final not in owned and final not in firsts \
-                        and not (settings.new_entries_only and final in registered):
+                # new_entries_only (evolvenew): the game's own list of never-caught species decides, even
+                # where owning a later stage would suggest an earlier one was caught (Victreebel can be
+                # caught without ever having a Weepinbell)
+                unowned = final not in registered if settings.new_entries_only else final not in owned
+                if final and unowned and final not in firsts:
                     # a new species is worth the same however it is reached, so the cheapest route wins
                     moves.append((base + from_base.get(final, p.candy) * cpc, rep, firsts | {final}))
                 for v, r, f in moves:

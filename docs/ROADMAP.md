@@ -70,8 +70,11 @@ Next from that recording:
       not yet, Mega only). Detail pages count as owned, one copy per CP; only evolutions into
       never-caught species are planned; `--candy` / `--item` fix or add counts. Tried on 7 real
       detail screenshots
-- [ ] Try a real swipe-through recording of the `evolvenew` results (does swiping on the detail
-      page stay inside the search results?)
+- [x] Tried on a real 30 s recording of the `evolvenew` grid (210 Pokémon, 75 species, 54 Mega
+      only), the Pokédex "Seen" screenshots and the bag: lists the 36 missing species and which
+      families' candy counts it needs; forms of one Pokédex entry are listed once
+- [ ] Does swiping between detail pages stay inside the `evolvenew` results? Then one swipe-through
+      recording could give the candy counts too
 - [ ] Read evolution items (apples, stones) from the bag screenshot instead of `--item`
 
 ### LLM screen readers
