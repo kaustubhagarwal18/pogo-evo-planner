@@ -4,7 +4,10 @@
 
 1. In your Pokémon storage, search `evolvenew` and screen-record yourself scrolling slowly
    through the results. The game lists every Pokémon whose evolution would be a new Pokédex
-   entry, including ones you can't afford yet.
+   entry, including ones you can't afford yet. Screenshots work too: scroll less than a screen
+   between them, so each row is whole and above the floating buttons in at least one. The tool
+   compares what it read with the count under the POKÉMON tab ("(210)") and warns if rows were
+   skipped.
 2. Open the Pokédex, tap the filter button, choose **Seen**, and screenshot the list.
 3. Screenshot your item bag showing Rare Candy.
 

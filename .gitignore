@@ -15,3 +15,6 @@ captures/
 /inventory*.json
 /evolvenew*.json
 /dashboard.html
+
+# notes for Claude Code, kept local
+CLAUDE.md

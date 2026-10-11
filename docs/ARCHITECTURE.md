@@ -122,6 +122,7 @@ These don't change the plan by themselves. They're reported so the player can fi
 | `unknown_species` | `plan()` | a scanned species isn't in the species table (usually because the bundled sample was used instead of `data/latest.json`) |
 | storage vs. silhouette | `scan()` | covered in 2a |
 | no bag screen | `scan()` | Rare Candy defaults to 0 |
+| rows skipped | `merge()` | after a storage search, fewer Pokémon were read than the count under the POKÉMON tab ("(210)"): screenshots or fast scrolling skipped rows |
 
 ## 3. Valuing an evolution
 
