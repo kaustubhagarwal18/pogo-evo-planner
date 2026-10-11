@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -10,7 +11,7 @@ import numpy as np
 from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.scan.frames import extract_frames
 from pogo_evo_planner.scan.ocr import Word, _split_line, available_backend
-from pogo_evo_planner.scan.pipeline import ScanReport, merge, scan
+from pogo_evo_planner.scan.pipeline import ScanReport, merge, scan, taken_at
 from pogo_evo_planner.scan.screens import (
     ScreenResult,
     SpeciesMatcher,
@@ -174,6 +175,31 @@ class ParserTests(unittest.TestCase):
         # unfiltered, the same header numbers are still ignored
         r = parse_pokedex([x for x in words if x.text != "Seen"], None, M)
         self.assertEqual(r.dex_caught, {"DRATINI", "DRAGONAIR"})
+
+    def test_merge_prefers_the_newest_capture(self):
+        # Snom: an older recording read 80 three times, today's screenshot reads 102
+        frames = [ScreenResult("detail", candy={"SNOM": 80})] * 3 + [ScreenResult("detail", candy={"SNOM": 102}),
+                                                                     ScreenResult("bag", rare_candy=300),
+                                                                     ScreenResult("bag", rare_candy=305)]
+        rep = ScanReport()
+        inv = merge(frames, rep, times=[1.0, 1.0, 1.0, 2.0, 1.0, 2.0])
+        self.assertEqual((inv["candy"], inv["rare_candy"]), ({"SNOM": 102}, 305))
+        self.assertTrue(any("using 102, from the newest capture" in x for x in rep.warnings))
+        # within one capture the most common reading still outvotes a misread frame
+        newest = [ScreenResult("detail", candy={"SNOM": 102})] * 2 + [ScreenResult("detail", candy={"SNOM": 162})]
+        self.assertEqual(merge(newest, ScanReport(), times=[2.0, 2.0, 2.0])["candy"], {"SNOM": 102})
+
+    def test_taken_at_reads_the_file_name(self):
+        # file names carry the phone's local time, with no time zone
+        self.assertEqual(taken_at("Screenshot_20261011-115015.png"),
+                         datetime(2026, 10, 11, 11, 50, 15).timestamp())  # noqa: DTZ001
+        self.assertEqual(taken_at("VID_20261004_225901.mp4"),
+                         datetime(2026, 10, 4, 22, 59, 1).timestamp())  # noqa: DTZ001
+        with tempfile.TemporaryDirectory() as d:   # no date in the name: when the file was last modified
+            f = Path(d) / "bag.png"
+            f.write_bytes(b"")
+            os.utime(f, (1_000_000, 1_000_000))
+            self.assertEqual(taken_at(f), 1_000_000)
 
     def test_merge_majority_decides_caught(self):
         frames = [ScreenResult("detail", dex_caught={"DRAGAPULT"}),        # one bad frame

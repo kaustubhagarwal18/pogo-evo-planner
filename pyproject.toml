@@ -53,7 +53,7 @@ disable = [
     "missing-class-docstring",    # mostly dataclasses
     "import-outside-toplevel",    # optional dependencies and faster CLI start-up are imported lazily
     "too-many-arguments", "too-many-positional-arguments", "too-many-locals",
-    "too-many-branches", "too-many-instance-attributes", "too-few-public-methods",
+    "too-many-branches", "too-many-instance-attributes", "too-few-public-methods", "too-many-public-methods",
 ]
 
 [tool.mypy]

@@ -1,8 +1,10 @@
 """Turn screenshots and screen recordings into a planner inventory."""
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -39,18 +41,55 @@ def load_images(paths: list[str | Path], fps: float = 3.0) -> list[tuple[str, np
     return out
 
 
-def merge(results: list[ScreenResult], report: ScanReport) -> dict:
-    """Combine per-screen readings into one inventory dict."""
-    rare = Counter(r.rare_candy for r in results if r.rare_candy is not None)
-    candy_votes: dict[str, Counter] = defaultdict(Counter)
+_STAMP = re.compile(r"(20\d{2})(\d{2})(\d{2})[-_ ]?(\d{2})(\d{2})(\d{2})")
+
+
+def taken_at(path: str | Path) -> float:
+    """When a screenshot or recording was taken: the date and time in its file name
+    (Screenshot_20261011-115015.png, VID_20261004_225901.mp4), else when the file was last modified."""
+    m = _STAMP.search(Path(path).name)
+    if m:
+        try:
+            year, month, day, hour, minute, second = map(int, m.groups())
+            # phones name files in local time, with no time zone
+            return datetime(year, month, day, hour, minute, second).timestamp()  # noqa: DTZ001
+        except ValueError:
+            pass
+    return Path(path).stat().st_mtime
+
+
+def _pick(name: str, votes: dict[float, Counter], report: ScanReport) -> int:
+    """One count from readings grouped by when their capture was taken: the newest capture's most
+    common reading. Counts change over time, so an older capture loses; within one capture, the
+    most common reading outvotes a misread frame."""
+    newest = max(votes)
+    value = votes[newest].most_common(1)[0][0]
+    every = sum(votes.values(), Counter())
+    if len(every) > 1:
+        how = "from the newest capture" if len(votes) > 1 else "the most common"
+        report.warnings.append(f"conflicting {name} readings {dict(every)}; using {value}, {how}")
+    return value
+
+
+def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | None = None) -> dict:
+    """Combine per-screen readings into one inventory dict.
+
+    times gives when each result's capture was taken (see taken_at); a count read differently in
+    different captures takes the newest. Without it, every result counts as taken at once.
+    """
+    times = times or [0.0] * len(results)
+    rare: dict[float, Counter] = defaultdict(Counter)
+    candy_votes: dict[str, dict[float, Counter]] = defaultdict(lambda: defaultdict(Counter))
     with_cp: set[tuple[str, int]] = set()
     no_cp: Counter = Counter()
     seen: set[str] = set()
     caught_votes: Counter = Counter()   # frames showing the species as caught (colour sprite, storage...)
     never_votes: Counter = Counter()    # frames showing it as never caught (silhouette, "Seen" list)
-    for r in results:
+    for r, when in zip(results, times):
+        if r.rare_candy is not None:
+            rare[when][r.rare_candy] += 1
         for fam, n in r.candy.items():
-            candy_votes[fam][n] += 1
+            candy_votes[fam][when][n] += 1
         frame_no_cp: Counter[str] = Counter()
         for sp, cp in r.specimens:
             if cp is None:
@@ -64,13 +103,8 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
         never_votes.update(r.dex_not_caught)
         report.warnings.extend(r.notes)
 
-    if len(rare) > 1:
-        report.warnings.append(f"conflicting Rare Candy readings {dict(rare)}; using the most common")
-    candy = {}
-    for fam, votes in candy_votes.items():
-        if len(votes) > 1:
-            report.warnings.append(f"conflicting {fam} candy readings {dict(votes)}; using the most common")
-        candy[fam] = votes.most_common(1)[0][0]
+    rare_candy = _pick("Rare Candy", rare, report) if rare else 0
+    candy = {fam: _pick(f"{fam} candy", votes, report) for fam, votes in candy_votes.items()}
 
     # majority vote per species: a single misread frame (a sprite still loading, a green Pokémon on a
     # green button) no longer decides on its own
@@ -85,7 +119,7 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
         pokemon += [{"species": sp, "cp": None, "label": "CP ?"}] * max(0, n - covered[sp])
 
     return {
-        "rare_candy": rare.most_common(1)[0][0] if rare else 0,
+        "rare_candy": rare_candy,
         "candy": dict(sorted(candy.items())),
         "items": {},
         "pokedex": sorted(caught),
@@ -122,7 +156,8 @@ def scan(paths: list[str | Path], species: dict, backend: str = "auto", fps: flo
                 progress(i + 1, len(frames), label, res.kind)
     report.frames_read = len(results)
     report.screens.update(res.kind for res in results)
-    inv = merge(results, report)
+    taken = {Path(p).name: taken_at(p) for p in paths}
+    inv = merge(results, report, [taken.get(label, taken.get(label.rsplit("#", 1)[0], 0.0)) for label, _ in frames])
 
     misread = sorted({p["species"] for p in inv["pokemon"]} & set(inv["not_caught"]))
     if misread:
