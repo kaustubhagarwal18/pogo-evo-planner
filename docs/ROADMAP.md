@@ -73,6 +73,12 @@ Next from that recording:
 - [x] Tried on a real 30 s recording of the `evolvenew` grid (210 Pokémon, 75 species, 54 Mega
       only), the Pokédex "Seen" screenshots and the bag: lists the 36 missing species and which
       families' candy counts it needs; forms of one Pokédex entry are listed once
+- [ ] **Known bug:** the grid shows nicknames, not species. A Victreebel listed for Mega
+      Victreebel and nicknamed "99%Bellsprou…" is read as a Bellsprout, so Weepinbell is reported
+      missing though it's owned; a Houndoom whose name the floating buttons half-hide is read as
+      "Houndour". Fixes to weigh: cross-check with a caught list from the Pokédex (an evolution
+      that's already caught means the reading was wrong), skip names with digits or symbols, skip
+      names in the strip behind the floating buttons
 - [ ] Does swiping between detail pages stay inside the `evolvenew` results? Then one swipe-through
       recording could give the candy counts too
 - [ ] Read evolution items (apples, stones) from the bag screenshot instead of `--item`

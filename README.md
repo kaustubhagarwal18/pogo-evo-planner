@@ -103,6 +103,19 @@ on a family whose candy count is unknown. Detail pages count as Pokémon you own
 include a page for each copy of a Pokémon with several evolutions (Applin, Eevee) you'd evolve.
 Add evolution items with `--item "Tart Apple=26"`. What was read is saved to `evolvenew.json`.
 
+#### Known issue: nicknamed Pokémon, especially ones listed for their Mega
+
+`evolvenew` also lists final forms for their Mega Evolution, and the results grid shows a
+Pokémon's nickname rather than its species. A nickname that looks like another species is read
+as that species. In the real run above, a Victreebel listed for Mega Victreebel and nicknamed
+"99%Bellsprou…" is read as a Bellsprout, so **Weepinbell is reported as missing although the
+player owns one**. A name half-hidden behind the floating buttons at the bottom of the screen
+can be misread the same way (a Houndoom read as "Houndour").
+
+Until this is fixed, check any surprising "missing" entry in the game. Clearing a misleading
+nickname also helps. A caught list from the Pokédex would let the tool catch these by itself
+(see the roadmap).
+
 ### The full scan
 
 To plan from your whole collection instead (including species you caught once but no longer own):
@@ -316,7 +329,8 @@ with the sample data, and the wrapped Candy XL label being read as regular candy
 the Evolve-button silhouette check. Expect more calibration on other phones; OCR still garbles
 some CP values and the storage grid sometimes pairs a name with a neighbouring cell's CP. The
 optional LLM readers (`--ocr llm` / `ollama` / `claude`) haven't been run on real captures yet,
-so their accuracy, speed and cost are unknown. See [docs/ROADMAP.md](docs/ROADMAP.md).
+so their accuracy, speed and cost are unknown. Nicknamed Pokémon can be read as the wrong
+species; see "Known issue" under the `evolvenew` quick start. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Development
 
