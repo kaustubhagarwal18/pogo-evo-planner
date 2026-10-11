@@ -2,10 +2,11 @@
 
 Two models are supported:
 
+- `--ocr ollama` (also `--ocr llm`, the default LLM): an open-weight model run locally by Ollama
+  (https://ollama.com). Free, and nothing leaves your machine, but small models read less
+  accurately and are slow on a laptop.
 - `--ocr claude`: Claude through the Anthropic API. The most capable, but paid per frame, and the
   screenshots go to Anthropic. Needs ANTHROPIC_API_KEY (or a profile from `ant auth login`).
-- `--ocr ollama`: an open-weight model run locally by Ollama (https://ollama.com). Free, and
-  nothing leaves your machine, but small models read less accurately and are slow on a laptop.
 
 Either way the model returns a structured reading of the screen (bag, Pokémon detail page, storage
 grid or Pokédex). Names are matched to the species table the same way OCR text is, and Guardrails
@@ -289,6 +290,13 @@ class Ollama:
             raise ValueError(f"Ollama error: {e.error}") from e
 
 
+def make_model(backend: str, name: str | None = None) -> Claude | Ollama:
+    """The model for an --ocr choice: "claude", or "ollama"/"llm" (the default LLM: local and free)."""
+    if backend == "claude":
+        return Claude(name or CLAUDE_MODEL)
+    return Ollama(name or OLLAMA_MODEL)
+
+
 def read_reading(img: np.ndarray, model: Claude | Ollama, guard: Guard, matcher: SpeciesMatcher,
                  reasks: int = REASKS) -> tuple[ScreenReading | None, list[str]]:
     """Ask the model to read one frame, check it, and retry with the failures; returns (reading, notes)."""
@@ -340,11 +348,13 @@ def to_screen_result(reading: ScreenReading, matcher: SpeciesMatcher, species: d
 
 
 def read_screens(frames: list[tuple[str, np.ndarray]], matcher: SpeciesMatcher, species: dict,
-                 model: Claude | Ollama, progress: Callable | None = None) -> list[ScreenResult]:
-    """Read every frame with the model, in parallel where it allows, keeping frame order.
+                 model: Claude | Ollama | None = None, progress: Callable | None = None) -> list[ScreenResult]:
+    """Read every frame with the model (default: the local Ollama one), in parallel where it allows, in order.
 
     Raises ValueError, with what to do, when the model can't be used (no credentials, Ollama not running...).
     """
+    model = model or make_model("llm")
+
     def one(img: np.ndarray) -> ScreenResult:
         # a guard per frame, so threads don't share one
         reading, notes = read_reading(img, model, build_guard(), matcher)

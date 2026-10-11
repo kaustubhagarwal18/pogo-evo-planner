@@ -157,6 +157,13 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual([r.kind for r in results], ["bag", "storage"])
         self.assertEqual(seen, [("a", "bag"), ("b", "storage")])
 
+    def test_ollama_is_the_default_llm(self):
+        self.assertIsInstance(llm.make_model("llm"), llm.Ollama)
+        self.assertIsInstance(llm.make_model("ollama"), llm.Ollama)
+        self.assertEqual(llm.make_model("llm").model, "qwen3-vl:4b")
+        self.assertEqual(llm.make_model("llm", "qwen3-vl:2b").model, "qwen3-vl:2b")
+        self.assertIsInstance(llm.make_model("claude"), llm.Claude)  # paid: only when asked for by name
+
     def test_ollama_request_and_reading(self):
         fake = FakeOllama(reading(kind="bag", rare_candy=42).model_dump_json())
         res, notes = self.read(llm.Ollama(client=fake))

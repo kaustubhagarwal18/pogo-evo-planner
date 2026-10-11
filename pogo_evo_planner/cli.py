@@ -175,10 +175,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("scan", help="OCR screenshots / screen recordings into an inventory JSON")
     s.add_argument("files", nargs="+", help="screenshots (.png/.jpg) and/or recordings (.mp4/.mov)")
     s.add_argument("-o", "--output", default="inventory.json")
-    s.add_argument("--ocr", choices=["auto", "rapidocr", "tesseract", "claude", "ollama"], default="auto",
-                   help="screen reader. LLMs need the llm extras: 'claude' sends each frame to the Claude API "
-                        "(paid); 'ollama' runs a local model with Ollama (free, slower)")
-    s.add_argument("--llm-model", help="model for --ocr claude/ollama (default: claude-opus-5-5 / qwen3-vl:4b)")
+    s.add_argument("--ocr", choices=["auto", "rapidocr", "tesseract", "llm", "ollama", "claude"], default="auto",
+                   help="screen reader (default: OCR). LLMs need the llm extras: 'llm' is the default LLM, "
+                        "'ollama' (a local model, free); 'claude' sends each frame to the Claude API (paid)")
+    s.add_argument("--llm-model", help="model for --ocr llm/ollama/claude (default: qwen3-vl:4b / claude-opus-5-5)")
     s.add_argument("--llm-max-frames", type=int, default=60,
                    help="with --ocr claude, refuse to send more frames than this (default 60)")
     s.add_argument("--fps", type=float, default=3.0, help="frames per second sampled from recordings")

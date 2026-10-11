@@ -91,20 +91,19 @@ def scan(paths: list[str | Path], species: dict, backend: str = "auto", fps: flo
          progress=None, max_llm_frames: int = 60, llm_model: str | None = None) -> tuple[dict, ScanReport]:
     """OCR every screenshot and recording frame, parse each screen, and merge them into an inventory and report.
 
-    backend "claude" or "ollama" reads the screens with a vision LLM instead of OCR (see scan/llm.py).
+    backend "llm" (= "ollama", local and free) or "claude" reads the screens with a vision LLM instead of
+    OCR (see scan/llm.py).
     Claude is paid per frame, so more than max_llm_frames frames is refused rather than sent.
     """
     matcher = SpeciesMatcher(species)
     report = ScanReport()
     frames = load_images(paths, fps=fps)
-    if backend in ("claude", "ollama"):
+    if backend in ("llm", "ollama", "claude"):
         if backend == "claude" and len(frames) > max_llm_frames:
             raise ValueError(f"{len(frames)} frames would each be a paid Claude request (limit {max_llm_frames}); "
                              "lower --fps, pass fewer files, or raise --llm-max-frames")
         from . import llm  # needs the `llm` extras
-        model = (llm.Claude(llm_model or llm.CLAUDE_MODEL) if backend == "claude"
-                 else llm.Ollama(llm_model or llm.OLLAMA_MODEL))
-        results = llm.read_screens(frames, matcher, species, model, progress=progress)
+        results = llm.read_screens(frames, matcher, species, llm.make_model(backend, llm_model), progress=progress)
     else:
         results = []
         for i, (label, img) in enumerate(frames):

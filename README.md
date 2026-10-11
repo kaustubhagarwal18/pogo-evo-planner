@@ -154,9 +154,10 @@ What each screen provides:
 Instead of OCR, a vision LLM can read each frame as an image and return a structured reading:
 screen kind, Rare Candy, species, candy, the Evolve button's sprite, storage cells, Pokédex
 entries. It can identify a nicknamed Pokémon from its sprite, which OCR can't. Everything after
-that (merging frames, planning) is unchanged. Two models are supported:
+that (merging frames, planning) is unchanged. OCR stays the default; `--ocr llm` picks the default
+LLM, which is Ollama. Two models are supported:
 
-| | `--ocr ollama` | `--ocr claude` |
+| | `--ocr llm` / `--ocr ollama` (default LLM) | `--ocr claude` |
 |---|---|---|
 | Model | runs on your machine with [Ollama](https://ollama.com); default `qwen3-vl:4b` | Claude (`claude-opus-5-5`) through the Anthropic API |
 | Cost | free | paid per frame (rough, unmeasured estimate: a few cents each) |
@@ -168,7 +169,7 @@ pip install -e '.[llm]'              # Anthropic SDK, Ollama client, Guardrails 
 
 # free, local: install Ollama from https://ollama.com and start it, then
 ollama pull qwen3-vl:4b              # 3.3 GB; fits an 8 GB Mac (qwen3-vl:2b is 1.9 GB)
-pogo-evo-planner scan bag.png detail.png --ocr ollama --species data/latest.json
+pogo-evo-planner scan bag.png detail.png --ocr llm --species data/latest.json
 
 # paid, Claude
 export ANTHROPIC_API_KEY=...          # or: ant auth login
