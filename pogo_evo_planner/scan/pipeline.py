@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import re
+import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -50,9 +50,8 @@ def taken_at(path: str | Path) -> float:
     m = _STAMP.search(Path(path).name)
     if m:
         try:
-            year, month, day, hour, minute, second = map(int, m.groups())
-            # phones name files in local time, with no time zone
-            return datetime(year, month, day, hour, minute, second).timestamp()  # noqa: DTZ001
+            # phones name files in local time, with no time zone; strptime rejects impossible dates
+            return time.mktime(time.strptime("".join(m.groups()), "%Y%m%d%H%M%S"))
         except ValueError:
             pass
     return Path(path).stat().st_mtime
