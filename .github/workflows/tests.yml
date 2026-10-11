@@ -1,8 +1,11 @@
 name: tests
 
-# Runs everything in tests/ on every push, on any branch, and on demand from the Actions tab.
+# Runs everything in tests/ on pull requests (from this repository or a fork), on pushes to main, and on
+# demand from the Actions tab: once per pull request, with no skipped duplicate runs.
 on:
   push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -12,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false   # see every Python version's result, not just the first failure
       matrix:
-        python: ["3.10", "3.12", "3.13", "3.14"]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -177,6 +177,14 @@ class PlannerTests(unittest.TestCase):
         inv = Inventory(50, {"TANDEMAUS": 0}, {}, set(), [Specimen("TANDEMAUS"), Specimen("MAUSHOLD")])
         self.assertEqual(plan(species, TIERS, inv).families, [])
 
+    def test_no_rare_candy_for_a_family_without_a_candy_count(self):
+        """A family with no candy count is unknown, not 0: no Rare Candy goes to it, and the plan says so."""
+        inv = Inventory(200, {}, {}, set(), [Specimen("DRATINI")])
+        p = plan(SPECIES, TIERS, inv)
+        self.assertEqual((p.rare_candy_used, p.families, p.no_candy_count), (0, [], ["DRATINI"]))
+        inv.candy["DRATINI"] = 0       # a known count of 0 can be topped up: Dratini -> Dragonair -> Dragonite
+        self.assertEqual(plan(SPECIES, TIERS, inv).rare_candy_used, 125)
+
     def test_candy_count_only_missing_where_it_matters(self):
         """A missing candy count is reported only for families that can still evolve into something new."""
         inv = Inventory(0, {}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONITE"),  # nothing new left

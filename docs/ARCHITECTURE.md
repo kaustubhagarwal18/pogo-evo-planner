@@ -4,6 +4,13 @@ How `pogo-evo-planner` turns screens into a ranked evolution plan, focused on th
 that decide the result: **finding what the player is missing** and **ranking what to evolve**.
 The README's "How it works" section is the short version; this is the long one.
 
+Two commands share the same scanner and planner:
+
+- **`evolvenew`**, the quick way: it reads only what the game's `evolvenew` search lists, plus
+  the Pokédex "Seen" list and the item bag, then asks for the candy counts it needs (2d).
+- **`scan`, then `plan` or `dashboard`**: it reads the whole collection into an `inventory.json`
+  that the player reviews and edits by hand.
+
 ```mermaid
 flowchart LR
     subgraph scan["scan/"]
@@ -13,11 +20,16 @@ flowchart LR
         F -.->|optional LLM reader| L[llm.py<br/>vision LLM reads the screen,<br/>Guardrails checks it]
         L --> M
     end
-    M --> J[(inventory.json<br/>review / edit by hand)]
+    M -->|scan| J[(inventory.json<br/>review / edit by hand)]
+    M -->|evolvenew| E[evolvenew.apply_evolvenew<br/>what's missing, Mega only]
+    E --> Q[ask for missing candy<br/>and evolution items]
+    Q --> EJ[(evolvenew.json)]
     G[(data/latest.json<br/>game master)] --> P
     T[(rarity_tiers.json)] --> P
     J --> P[planner.plan]
+    EJ --> P
     P --> R[cli.render<br/>text report]
+    P --> ER[evolvenew.render<br/>evolve now, Rare Candy, not yet]
     P --> D[dashboard.build_view<br/>HTML]
 ```
 
@@ -121,8 +133,50 @@ These don't change the plan by themselves. They're reported so the player can fi
 | `families_missing_candy` | planner, used by scan and dashboard | a family has no candy count **and** an owned member can still evolve, at any depth, into a species not in `owned`. Families that can't reach anything new are left out because their candy doesn't matter. |
 | `unknown_species` | `plan()` | a scanned species isn't in the species table (usually because the bundled sample was used instead of `data/latest.json`) |
 | storage vs. silhouette | `scan()` | covered in 2a |
-| no bag screen | `scan()` | Rare Candy defaults to 0 |
+| no bag screen | `scan()` | Rare Candy defaults to 0 (`evolvenew` stops instead and asks for `--rare-candy`) |
 | rows skipped | `merge()` | after a storage search, fewer Pokémon were read than the count under the POKÉMON tab ("(210)"): screenshots or fast scrolling skipped rows |
+
+### 2d. The `evolvenew` shortcut (`evolvenew.py`)
+
+The game's `evolvenew` storage search lists every Pokémon with at least one evolution that would
+be a new Pokédex entry. That includes ones the player can't afford yet, and final forms listed
+only for a Mega Evolution. The `evolvenew` command reads that list instead of the whole
+collection:
+
+```mermaid
+flowchart TD
+    G[evolvenew results:<br/>recording or screenshots] -->|storage parser| L[listed Pokémon]
+    G -->|"(210) under the POKÉMON tab"| CNT[rows-skipped check]
+    SEEN[Pokédex filtered to Seen] --> NC[not_caught]
+    BAG[item bag] --> RC[Rare Candy]
+    L --> A[apply_evolvenew]
+    NC --> A
+    A -->|no candy evolution| MEGA[Mega Evolution only:<br/>listed, not planned]
+    A -->|evolutions not caught or held| NC2[not_caught]
+    NC2 --> MS["missing(): species to evolve into,<br/>species to catch"]
+    MS --> ASK["ask_for_candy, ask_for_items<br/>(in a terminal, unless --no-ask)"]
+    ASK --> PL["plan with new_entries_only"]
+    RC --> PL
+    PL --> R["render: evolve now, use Rare Candy,<br/>not yet, Mega only"]
+```
+
+- `apply_evolvenew` marks each listed Pokémon's evolutions as never caught, unless the Pokédex
+  reading shows them caught or the player holds one (nobody is missing a species they hold).
+  A listed Pokémon with no candy evolution is there for its Mega Evolution, which costs Mega
+  Energy, not candy, so it is reported but not planned.
+- `missing()` gives one row per Pokédex entry: forms share an entry, and the cheapest route is
+  kept. Each row is either a species to evolve into (with the Pokémon the player owns and the
+  candy cost) or a never-caught species nothing owned evolves into, which has to be caught.
+- The grid shows no candy counts. The command asks for each family's count, as a number or a
+  screenshot of that Pokémon's page, and for the evolution items the missing species need. It
+  saves the answers to `evolvenew.json` and prints the `--candy` and `--item` flags that skip
+  the questions next time.
+- Planning uses `new_entries_only`: only evolutions into never-caught species count, and the
+  forms of one Pokédex entry count once. A family without a candy count gets no Rare Candy
+  (see 4b).
+- Known limits, from the README's "Known issue" sections:
+  - every branch of a branching Pokémon is treated as new;
+  - a nickname is read as whichever species it looks like.
 
 ## 3. Valuing an evolution
 
@@ -204,6 +258,11 @@ option per family (the empty option is always available), with total Rare Candy 
 and shared items within stock. It returns the state with the highest total value and, on a
 tie, the one using less Rare Candy.
 
+A family with no candy count gets no Rare Candy at all. Its count is unknown, not 0, and reading
+it as 0 would spend Rare Candy on the whole cost of an evolution the player may already afford,
+or may be far from. `plan()` lists those families in `no_candy_count`, and the text report names
+them. `rare_candy_blocked_families` can block more families on top of these.
+
 Because value only comes from completing an evolution, the optimiser never suggests a
 partial top-up and never spends Rare Candy just to use it up. In the real scan above it
 used 123 of 305 Rare Candy and left the rest.
@@ -214,12 +273,12 @@ The optimiser picks the set; display order is a separate step:
 
 | Output | Grouping | Order |
 |---|---|---|
+| `evolvenew` text (`evolvenew.render`) | "Evolve now", "Use Rare Candy", "Not yet", "Mega Evolution only" | Rare Candy rows by value per Rare Candy (best use first) |
 | `plan` text report (`cli.render`) | "Spend rare candy on", "Already affordable with your own candy", "Trade instead" | Rare Candy used, then value |
-| dashboard (`data/dashboard.html`) | needs Rare Candy / own candy only | value, shown with value per candy |
+| dashboard (`data/dashboard.html`) | needs Rare Candy / own candy only | Rare Candy families by value per Rare Candy (best use first), own-candy families by value |
 
-The dashboard also shows each scanned Pokémon's status: planned evolution, trade, "Fully
-evolved", "Not planned", "Not in species data", or "Probably misread" (in storage but
-`not_caught`).
+The dashboard also lists the Pokémon left out of the plan ("Not planned") and any species
+missing from the species data.
 
 ## 5. Settings
 
@@ -228,7 +287,8 @@ evolved", "Not planned", "Not in species data", or "Probably misread" (in storag
 | `dex_bonus` | 20 | `--dex-bonus` | km-equivalent value of a new Pokédex entry |
 | `repeat_value` | 0 | `--repeat-value` | share of value kept by evolving into a species already owned |
 | `allow_trade_evolutions` | off | `--allow-trade-evos` | spend candy on evolutions that are free by trading |
-| `rare_candy_blocked_families` | none | — | families that may only use their own candy |
+| `new_entries_only` | off | set by `evolvenew` | only evolutions into never-caught species count; the forms of one Pokédex entry count once |
+| `rare_candy_blocked_families` | none | — | more families that may only use their own candy (a family without a candy count already is) |
 
 ## 6. Where to look
 
@@ -240,5 +300,6 @@ evolved", "Not planned", "Not in species data", or "Probably misread" (in storag
 | merging frames, scan warnings | [`scan/pipeline.py`](../pogo_evo_planner/scan/pipeline.py) |
 | owned / registered sets, valuation, DP, knapsack | [`planner.py`](../pogo_evo_planner/planner.py) |
 | game master parsing | [`gamemaster.py`](../pogo_evo_planner/gamemaster.py) |
-| text report | [`cli.py`](../pogo_evo_planner/cli.py) |
+| the `evolvenew` flow: what's missing, the questions, the plain-words plan | [`evolvenew.py`](../pogo_evo_planner/evolvenew.py) |
+| commands, their error messages, text report | [`cli.py`](../pogo_evo_planner/cli.py) |
 | dashboard data | [`dashboard.py`](../pogo_evo_planner/dashboard.py) |

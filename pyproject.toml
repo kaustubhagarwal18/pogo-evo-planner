@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pogo-evo-planner"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pokémon GO evolution and Rare Candy planner, fed by OCR of screenshots and screen recordings"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,8 +19,9 @@ ocr = ["pogo-evo-planner[scan]", "rapidocr>=2", "onnxruntime>=1.16", "rapidfuzz>
 # read screens with a vision LLM instead of OCR, checked with Guardrails AI:
 # Claude (paid API) or a local model through Ollama (free)
 llm = ["pogo-evo-planner[scan]", "anthropic>=1.13", "ollama>=0.6", "guardrails-ai>=0.10"]
-dev = ["pogo-evo-planner[scan]", "pillow>=10", "pytest>=8", "ruff>=0.5",
-       "pylint>=4", "mypy>=2", "bandit>=1.8", "codespell>=2.3"]
+# linters pinned, so `make lint` and CI run the same versions: a newer Ruff once failed CI on code that passed locally
+dev = ["pogo-evo-planner[scan]", "pillow>=10", "pytest>=8", "ruff==0.16.10",
+       "pylint==4.1.2", "mypy==2.4.0", "bandit==1.9.4", "codespell==2.4.3"]
 
 [project.scripts]
 pogo-evo-planner = "pogo_evo_planner.cli:main"

@@ -38,7 +38,7 @@ def extract_frames(video: str | Path, fps: float = 3.0, threshold: float = 1.0,
     """
     cap = cv2.VideoCapture(str(video))
     if not cap.isOpened():
-        raise FileNotFoundError(video)
+        raise ValueError(f"can't read {video}: not a video")
     src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(1, round(src_fps / fps))
     groups: list[list[np.ndarray]] = []
