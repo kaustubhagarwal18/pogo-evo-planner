@@ -1,8 +1,8 @@
 import json
 import os
 import tempfile
+import time
 import unittest
-from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -190,16 +190,16 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(merge(newest, ScanReport(), times=[2.0, 2.0, 2.0])["candy"], {"SNOM": 102})
 
     def test_taken_at_reads_the_file_name(self):
-        # file names carry the phone's local time, with no time zone
-        self.assertEqual(taken_at("Screenshot_20261011-115015.png"),
-                         datetime(2026, 10, 11, 11, 50, 15).timestamp())  # noqa: DTZ001
-        self.assertEqual(taken_at("VID_20261004_225901.mp4"),
-                         datetime(2026, 10, 4, 22, 59, 1).timestamp())  # noqa: DTZ001
-        with tempfile.TemporaryDirectory() as d:   # no date in the name: when the file was last modified
-            f = Path(d) / "bag.png"
-            f.write_bytes(b"")
-            os.utime(f, (1_000_000, 1_000_000))
-            self.assertEqual(taken_at(f), 1_000_000)
+        def local(stamp):   # file names carry the phone's local time, with no time zone
+            return time.mktime(time.strptime(stamp, "%Y%m%d%H%M%S"))
+        self.assertEqual(taken_at("Screenshot_20261011-115015.png"), local("20261011115015"))
+        self.assertEqual(taken_at("VID_20261004_225901.mp4"), local("20261004225901"))
+        with tempfile.TemporaryDirectory() as d:   # no date (or an impossible one): when the file was last modified
+            for name in ("bag.png", "IMG_20261399_250000.png"):
+                f = Path(d) / name
+                f.write_bytes(b"")
+                os.utime(f, (1_000_000, 1_000_000))
+                self.assertEqual(taken_at(f), 1_000_000)
 
     def test_merge_majority_decides_caught(self):
         frames = [ScreenResult("detail", dex_caught={"DRAGAPULT"}),        # one bad frame
