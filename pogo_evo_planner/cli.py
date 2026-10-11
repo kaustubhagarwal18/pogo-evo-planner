@@ -125,7 +125,7 @@ def cmd_dashboard(a) -> None:
 def cmd_evolvenew(a) -> None:
     """Handle `pogo-evo-planner evolvenew`: read the detail pages of the Pokémon the game's `evolvenew`
     search lists, then print what to evolve and where Rare Candy goes."""
-    from .evolvenew import apply_evolvenew, candy_overrides, item_overrides, unknown_candy
+    from .evolvenew import apply_evolvenew, ask_for_candy, candy_overrides, item_overrides, unknown_candy
     from .evolvenew import render as render_evolvenew
     from .scan.pipeline import scan
 
@@ -163,7 +163,25 @@ def cmd_evolvenew(a) -> None:
     print(f"Saved -> {a.output} (fix a misread count with --candy NAME=N)\n", file=sys.stderr)
     a.blocked = unknown_candy(load_inventory(a.output), species)   # never guess a count as 0 and fill it
     result, plan_inv = _make_plan(a, species, a.output)
-    print(render_evolvenew(result, plan_inv, species, listing), end="")
+    if not a.blocked or a.no_ask or not sys.stdin.isatty():
+        print(render_evolvenew(result, plan_inv, species, listing), end="")
+    else:
+        # show what's missing, ask for the candy counts it needs, then plan with the answers
+        print(render_evolvenew(result, plan_inv, species, listing, show_plan=False))
+
+        def read_candy(paths: list[str]) -> dict[str, int]:
+            """Read candy counts from detail-page screenshots."""
+            return scan(paths, species, backend=a.ocr, fps=a.fps)[0]["candy"]
+
+        answers = ask_for_candy(plan_inv, species, ask=input, read=read_candy, say=print)
+        if answers:
+            inv["candy"].update(answers)
+            Path(a.output).write_text(json.dumps(inv, indent=2) + "\n", encoding="utf-8")
+            a.blocked = unknown_candy(load_inventory(a.output), species)
+            result, plan_inv = _make_plan(a, species, a.output)
+            given = " ".join(f"--candy {f}={n}" for f, n in sorted(answers.items()))
+            print(f"\nSaved your counts to {a.output}. To skip the questions next time: {given}\n")
+        print(render_evolvenew(result, plan_inv, species, listing, show_missing=False), end="")
     if a.dashboard:
         _write_dashboard(a, species, a.output, a.dashboard, ", ".join(Path(f).name for f in a.files))
 
@@ -233,6 +251,8 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--item", action="append", default=[], metavar="NAME=N",
                    help='evolution items you hold, e.g. --item "Tart Apple=26" --item "Metal Coat=1" (repeatable)')
     e.add_argument("-o", "--output", default="evolvenew.json", help="where to save what was read")
+    e.add_argument("--no-ask", action="store_true",
+                   help="don't ask for missing candy counts; just list them (asking only happens in a terminal)")
     e.add_argument("--ocr", choices=["auto", "rapidocr", "tesseract", "llm", "ollama", "claude"], default="auto",
                    help="screen reader (default: OCR)")
     e.add_argument("--fps", type=float, default=3.0, help="frames per second sampled from recordings")

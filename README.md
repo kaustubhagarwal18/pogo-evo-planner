@@ -27,19 +27,19 @@ long-running scanner apps stay behind, and it keeps accounts safe from Terms of 
 
 ## Quick start
 
-Requires Python 3.10+. Use a virtualenv (activate it in every new terminal):
+Requires Python 3.10+. Get the code and set it up once:
 
 ```bash
+git clone https://github.com/kaustubhagarwal18/pogo-evo-planner.git
+cd pogo-evo-planner
 python3.14 -m venv .venv    # any Python >= 3.10
 source .venv/bin/activate
+make install-ocr            # pip install -e '.[ocr,dev]'  (RapidOCR + RapidFuzz)
+make gamemaster             # latest datamined game data -> data/latest.json
 ```
 
-Then, once:
-
-```bash
-make install-ocr        # pip install -e '.[ocr,dev]'  (RapidOCR + RapidFuzz)
-make gamemaster         # latest datamined game data -> data/latest.json (used automatically)
-```
+Every later session: open a terminal, `cd` into the project folder and run
+`source .venv/bin/activate`. Run the commands from that folder, so they find `data/latest.json`.
 
 ### The quick way: `evolvenew`
 
@@ -52,11 +52,16 @@ The game already knows most of the answer. Capture three things:
    never caught.
 3. **Your item bag**, showing Rare Candy (or pass `--rare-candy N` instead).
 
+Copy the recording and screenshots from your phone into the project's `captures/` folder (it's
+kept out of git), then:
+
 ```bash
-pogo-evo-planner evolvenew evolvenew.mp4 seen1.png seen2.png seen3.png bag.png
+pogo-evo-planner evolvenew captures/evolvenew.mp4 captures/seen1.png captures/seen2.png \
+    captures/seen3.png captures/bag.png
 ```
 
-The tool tells you which species you're missing (a real run, shortened):
+Reading a 30-second recording takes about 3 minutes. The tool then tells you which species
+you're missing (a real run, shortened):
 
 ```
 You're missing 36 species.
@@ -79,9 +84,21 @@ Pokémon's page per family, or use --candy NAME=N:
   Applin, Bellsprout, Blipbug (e.g. Dottler), Charcadet, Dreepy (e.g. Drakloak), ...
 ```
 
-Then add the candy counts, as detail-page screenshots of those families (one each) or as
-`--candy Naclstack=72` (a Pokémon's name or its family's), and run it again. The output then
-continues with the Rare Candy plan:
+Next it asks for those candy counts, one family at a time:
+
+```
+18 families need a candy count. For each, type the number, or the path of a screenshot of that
+Pokémon's page (you can drag the file in), or press Enter to skip; q stops.
+Nacli candy (Naclstack → Garganacl needs 100): 72
+Dreepy candy (Drakloak → Dragapult needs 100): captures/drakloak.png
+  read 92
+...
+```
+
+The candy count is shown on any Pokémon's page in that family. With the answers it prints the
+Rare Candy plan, saves the counts, and shows the `--candy` options that skip the questions next
+time (`--candy Naclstack=72` takes a Pokémon's name or its family's). `--no-ask` only lists
+what's missing. The plan looks like this:
 
 ```
 Rare Candy: 110 of 305 used
@@ -103,18 +120,24 @@ on a family whose candy count is unknown. Detail pages count as Pokémon you own
 include a page for each copy of a Pokémon with several evolutions (Applin, Eevee) you'd evolve.
 Add evolution items with `--item "Tart Apple=26"`. What was read is saved to `evolvenew.json`.
 
-#### Known issue: nicknamed Pokémon, especially ones listed for their Mega
+#### Known issue: nicknamed Pokémon
 
-`evolvenew` also lists final forms for their Mega Evolution, and the results grid shows a
+OCR reads the name under each Pokémon in the grid, never its picture, and the grid shows a
 Pokémon's nickname rather than its species. A nickname that looks like another species is read
-as that species. In the real run above, a Victreebel listed for Mega Victreebel and nicknamed
-"99%Bellsprou…" is read as a Bellsprout, so **Weepinbell is reported as missing although the
-player owns one**. A name half-hidden behind the floating buttons at the bottom of the screen
-can be misread the same way (a Houndoom read as "Houndour").
+as that species. Two cases from the real run above:
 
-Until this is fixed, check any surprising "missing" entry in the game. Clearing a misleading
-nickname also helps. A caught list from the Pokédex would let the tool catch these by itself
-(see the roadmap).
+- A Victreebel, on the list for Mega Victreebel and nicknamed "99%Bellsprou…", is read as a
+  Bellsprout, so **Weepinbell is reported missing although the player owns one**.
+- A renamed Doublade is read as a Honedge, so **Doublade is reported missing (it's owned) and
+  Aegislash, the species really missing, isn't listed at all**. A nickname can hide a gap, not
+  just add a false one.
+
+A name half-hidden behind the floating buttons at the bottom of the screen can be misread the
+same way (a Houndoom read as "Houndour").
+
+Until this is fixed, clear nicknames on the Pokémon in your `evolvenew` results before
+recording, and check any surprising entry in the game. The planned fix is to recognise the
+Pokémon from its picture with a local vision model through Ollama (see the roadmap).
 
 ### The full scan
 
@@ -131,9 +154,9 @@ pogo-evo-planner dashboard inventory.json -o dashboard.html --open
 
 `pogo-evo-planner scan ... --dashboard dashboard.html` scans and writes the dashboard in one go.
 
-Every command uses `data/latest.json` when it exists (run them from the project folder);
-without it they fall back to a small bundled sample, and every species missing from it (all of
-Paldea, for example) is silently dropped. `--species` picks another file.
+Every command uses `data/latest.json` when it exists; without it (not run from the project
+folder, or before `make gamemaster`) they fall back to a small bundled sample, and every species
+missing from it (all of Paldea, for example) is silently dropped. `--species` picks another file.
 
 Scanning took about 1.5 s per frame with RapidOCR on an Apple Silicon laptop. A recording is sampled at
 3 fps, so a few minutes of scrolling can take 10+ minutes to scan. `--fps 1` is about three times

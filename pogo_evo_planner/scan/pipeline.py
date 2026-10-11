@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import time
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,7 +27,7 @@ class ScanReport:
     warnings: list[str] = field(default_factory=list)
 
 
-def load_images(paths: list[str | Path], fps: float = 3.0) -> list[tuple[str, np.ndarray]]:
+def load_images(paths: Sequence[str | Path], fps: float = 3.0) -> list[tuple[str, np.ndarray]]:
     """Expand a mix of image and video paths into (label, frame) pairs."""
     out = []
     for p in map(Path, paths):
@@ -135,7 +136,7 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     }
 
 
-def scan(paths: list[str | Path], species: dict, backend: str = "auto", fps: float = 3.0,
+def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps: float = 3.0,
          progress=None, max_llm_frames: int = 60, llm_model: str | None = None) -> tuple[dict, ScanReport]:
     """OCR every screenshot and recording frame, parse each screen, and merge them into an inventory and report.
 

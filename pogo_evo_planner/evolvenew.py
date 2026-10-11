@@ -13,6 +13,8 @@ Candy count, and gets the plan:
 """
 from __future__ import annotations
 
+import shlex
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .gamemaster import item_id, item_name
@@ -108,8 +110,21 @@ def unknown_candy(inv: Inventory, species: dict) -> frozenset[str]:
                      if species[frm]["family"] not in inv.candy)
 
 
-def render(p: Plan, inv: Inventory, species: dict, listing: Listing) -> str:
-    """Which species you're missing, then the plan in plain words: evolve now, use Rare Candy, not yet."""
+def render(p: Plan, inv: Inventory, species: dict, listing: Listing,
+           show_missing: bool = True, show_plan: bool = True) -> str:
+    """Which species you're missing, then the plan in plain words: evolve now, use Rare Candy, not yet.
+
+    The command asks for missing candy counts in between, so it prints the two parts separately;
+    the closing notes go with the plan, at the end.
+    """
+    out = _render_missing(inv, species, listing) if show_missing else []
+    if show_plan:
+        out += _render_plan(p, inv, species) + _render_notes(listing)
+    return "\n".join(out).rstrip() + "\n"
+
+
+def _render_missing(inv: Inventory, species: dict, listing: Listing) -> list[str]:
+    """What you're missing: species to evolve into, species to catch, and Mega-only Pokémon."""
     evolve, catch = missing(inv, species)
     out = [f"You're missing {len(evolve) + len(catch)} species.", ""]
     if evolve:
@@ -128,47 +143,56 @@ def render(p: Plan, inv: Inventory, species: dict, listing: Listing) -> str:
     if listing.mega_only:
         out += [f"Mega Evolution only ({len(listing.mega_only)}, need Mega Energy, not planned):",
                 "  " + ", ".join(map(_name, listing.mega_only)), ""]
+    return out
 
+
+def _render_plan(p: Plan, inv: Inventory, species: dict) -> list[str]:
+    """The Rare Candy plan: evolve now, use Rare Candy, not yet, and the candy counts still needed."""
     planned: set[str] = set()
     now, rare = [], []
     for f in sorted(p.families, key=lambda f: -f.value):
+        lines = []
         for path in f.paths:
             if not path.steps:
                 continue
             planned.update(s.to for s in path.steps)
             chain = " → ".join([_name(path.steps[0].frm)] + [_name(s.to) for s in path.steps])
-            needs = _needs([(s.item, list(s.notes)) for s in path.steps])
-            if f.rare_candy:
-                rare.append(f"  {chain}  +{f.rare_candy} Rare Candy{needs}")
-            else:
-                now.append(f"  {chain}{needs}")
+            lines.append(f"  {chain}{_needs([(s.item, list(s.notes)) for s in path.steps])}")
+        if not f.rare_candy:
+            now += lines
+        elif len(lines) == 1:   # Rare Candy is per family: inline for one evolution, a total for several
+            rare.append(lines[0].replace(" (", f"  +{f.rare_candy} Rare Candy (", 1) if " (" in lines[0]
+                        else f"{lines[0]}  +{f.rare_candy} Rare Candy")
+        else:
+            rare += lines + [f"    +{f.rare_candy} Rare Candy for the {_name(f.family)} family"]
     later = _not_yet(inv, species, planned, p)
-    if now or rare or later:
-        out += [f"Rare Candy: {p.rare_candy_used} of {p.rare_candy_available} used", ""]
-    if now:
-        out += ["Evolve now with your own candy:", *now, ""]
-    if rare:
-        out += ["Use Rare Candy:", *rare, ""]
-    if later:
-        out += ["Not yet:", *later, ""]
+    out = [f"Rare Candy: {p.rare_candy_used} of {p.rare_candy_available} used", ""] if now or rare or later else []
+    for title, rows in (("Evolve now with your own candy:", now), ("Use Rare Candy:", rare), ("Not yet:", later)):
+        if rows:
+            out += [title, *rows, ""]
     if p.trade_instead:
         out += ["Free by trading:",
                 *sorted({f"  {_name(s.frm)} → {_name(s.to)}" for _, s in p.trade_instead}), ""]
-    unknown = sorted({(species[frm]["family"], frm) for _, frm, _ in evolve
+    unknown = sorted({(species[frm]["family"], frm) for _, frm, _ in missing(inv, species)[0]
                       if species[frm]["family"] not in inv.candy})
     if unknown:
         out += [(f"To plan your {p.rare_candy_available} Rare Candy for the rest, add each family's candy count: "
                  "screenshot one Pokémon's page per family, or use --candy NAME=N:"),
                 "  " + ", ".join(f"{_name(fam)} (e.g. {_name(frm)})" if fam != frm else _name(fam)
                                  for fam, frm in unknown), ""]
+    return out
+
+
+def _render_notes(listing: Listing) -> list[str]:
+    """Closing notes: evolutions listed but already held or caught, and branch notes."""
+    out = []
     if listing.already_held:
         out += ["Listed by evolvenew, but you already have one (maybe a different form or costume):",
                 "  " + ", ".join(map(_name, sorted(set(listing.already_held)))), ""]
     if listing.already_caught:
         out += ["Already caught according to the Evolve button (not new):",
                 "  " + ", ".join(map(_name, sorted(set(listing.already_caught)))), ""]
-    out += [f"Note: {n}" for n in listing.notes]
-    return "\n".join(out).rstrip() + "\n"
+    return out + [f"Note: {n}" for n in listing.notes]
 
 
 def _not_yet(inv: Inventory, species: dict, planned: set[str], p: Plan) -> list[str]:
@@ -176,6 +200,7 @@ def _not_yet(inv: Inventory, species: dict, planned: set[str], p: Plan) -> list[
     already planned. Unknown candy counts are listed separately, as the next thing to add."""
     rows = []
     trade = {s.to for _, s in p.trade_instead}
+    planned_entries = {_dex(t, species) for t in planned}   # one form of a Pokédex entry is enough
     copies = {sp: sum(s.species == sp for s in inv.pokemon) for sp in {s.species for s in inv.pokemon}}
     taken = {sp: sum(path.specimen.species == sp for f in p.families for path in f.paths if path.steps)
              for sp in copies}
@@ -183,7 +208,8 @@ def _not_yet(inv: Inventory, species: dict, planned: set[str], p: Plan) -> list[
         fam = species.get(sp, {}).get("family")
         for e in species.get(sp, {}).get("evolutions", []):
             to = e["to"]
-            if to in planned or to in trade or to not in inv.not_caught or to in copies:
+            if to in planned or _dex(to, species) in planned_entries or to in trade or to not in inv.not_caught \
+                    or to in copies:
                 continue
             have, cost = inv.candy.get(fam), int(e["candy"])
             if have is None:
@@ -200,6 +226,51 @@ def _not_yet(inv: Inventory, species: dict, planned: set[str], p: Plan) -> list[
                 why = "its candy is used by the picks above"
             rows.append(f"  {_name(sp)} → {_name(to)}: {why}{_needs([(None, e.get('notes', []))])}")
     return rows
+
+
+def ask_for_candy(inv: Inventory, species: dict, ask: Callable[[str], str],
+                  read: Callable[[list[str]], dict[str, int]], say: Callable[[str], None]) -> dict[str, int]:
+    """Ask for each missing candy count: a number, a screenshot of that Pokémon's page, or Enter to skip.
+
+    ask prompts and returns the answer (input), read OCRs screenshots into {family: candy}, say shows a
+    message. Returns the counts given, {family: count}. "q", or the end of input (Ctrl-D), stops asking.
+    """
+    wanted: dict[str, list[str]] = {}
+    for to, frm, cost in missing(inv, species)[0]:
+        fam = species[frm]["family"]
+        if fam not in inv.candy:
+            wanted.setdefault(fam, []).append(f"{_name(frm)} → {_name(to)} needs {cost}")
+    if not wanted:
+        return {}
+    say(f"{len(wanted)} families need a candy count. For each, type the number, or the path of a screenshot "
+        "of that Pokémon's page (you can drag the file in), or press Enter to skip; q stops.")
+    answers: dict[str, int] = {}
+    for fam, uses in wanted.items():
+        if fam in answers:   # already read from an earlier screenshot
+            continue
+        for _ in range(3):
+            try:
+                reply = ask(f"{_name(fam)} candy ({'; '.join(uses)}): ").strip()
+            except EOFError:   # Ctrl-D, or input ran out: plan with what was given
+                return answers
+            if not reply:
+                break
+            if reply.lower() in ("q", "quit"):
+                return answers
+            if reply.isdigit():
+                answers[fam] = int(reply)
+                break
+            try:
+                read_counts = read(shlex.split(reply))
+            except (ValueError, OSError) as e:
+                say(f"  couldn't read that: {e}")
+                continue
+            answers.update({f: n for f, n in read_counts.items() if f in wanted})   # any family it shows
+            if fam in read_counts:
+                say(f"  read {read_counts[fam]}")
+                break
+            say(f"  no {_name(fam)} candy count on that screenshot; type the number instead, or another screenshot")
+    return answers
 
 
 def candy_overrides(pairs: list[str], species: dict) -> dict[str, int]:

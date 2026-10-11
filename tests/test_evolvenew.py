@@ -10,6 +10,7 @@ from unittest import mock
 from pogo_evo_planner import cli
 from pogo_evo_planner.evolvenew import (
     apply_evolvenew,
+    ask_for_candy,
     candy_overrides,
     item_overrides,
     missing,
@@ -99,6 +100,32 @@ class EvolvenewTests(unittest.TestCase):
         text = render(plan(species, TIERS, inv, Settings(new_entries_only=True)), inv, species, listing)
         self.assertIn("Maushold (Family Of Four or Family Of Three)", text)
 
+    def test_one_form_fills_a_pokedex_entry(self):
+        species = {
+            "DUNSPARCE": {"dex": 206, "family": "DUNSPARCE", "buddy_km": 3, "evolutions": [
+                {"to": "DUDUNSPARCE_TWO", "candy": 50}, {"to": "DUDUNSPARCE_THREE", "candy": 50}]},
+            "DUDUNSPARCE": {"dex": 982, "family": "DUNSPARCE", "buddy_km": 3},
+            "DUDUNSPARCE_TWO": {"dex": 982, "family": "DUNSPARCE", "buddy_km": 3},
+            "DUDUNSPARCE_THREE": {"dex": 982, "family": "DUNSPARCE", "buddy_km": 3},
+        }
+        data, listing = apply_evolvenew(
+            {**scanned(candy={"DUNSPARCE": 173}), "pokemon": [{"species": "DUNSPARCE", "cp": cp, "label": ""}
+                                                             for cp in (500, 600)]}, species)
+        inv = inventory_from_dict(data)
+        p = plan(species, TIERS, inv, Settings(new_entries_only=True))
+        self.assertEqual(len([path for f in p.families for path in f.paths if path.steps]), 1)   # not both
+        self.assertNotIn("Not yet", render(p, inv, species, listing))   # the other form isn't "missing"
+
+    def test_rare_candy_shown_once_per_family(self):
+        data, listing = apply_evolvenew({**scanned(candy={"RALTS": 100}, rare=100),
+                                         "items": {"ITEM_SINNOH_STONE": 1},
+                                         "pokemon": [{"species": "KIRLIA", "cp": cp, "label": ""} for cp in (1, 2)]},
+                                        SPECIES)
+        inv = inventory_from_dict(data)
+        text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
+        self.assertIn("+100 Rare Candy for the Ralts family", text)
+        self.assertEqual(text.count("+100"), 1)   # not repeated on each of the family's lines
+
     def test_unknown_candy_never_gets_rare_candy(self):
         # Kubfu's candy wasn't read: counting it as 0 spent 200 Rare Candy on a guess
         data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS", candy={"FEEBAS": 30}, rare=300), SPECIES)
@@ -121,6 +148,55 @@ class EvolvenewTests(unittest.TestCase):
         inv = inventory_from_dict(data)
         text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
         self.assertIn("your 1 Kirlia is planned above; if you have another, add a screenshot of its page", text)
+
+    def test_asks_for_each_missing_candy_count(self):
+        data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS", "LARVITAR", "BELDUM"), SPECIES)
+        inv = inventory_from_dict(data)
+        replies = iter(["60",                 # Dratini: typed
+                        "shots/feebas.png",   # Feebas: read from a screenshot, which also shows Beldum's count
+                        "",                   # Larvitar: skipped
+                        "q"])                 # (Beldum was already read, so not asked)
+        asked, said, read = [], [], []
+
+        def ask(prompt):
+            asked.append(prompt)
+            return next(replies)
+
+        def reader(paths):
+            read.append(paths)
+            return {"FEEBAS": 30, "BELDUM": 40}
+
+        answers = ask_for_candy(inv, SPECIES, ask=ask, read=reader, say=said.append)
+        self.assertEqual(answers, {"DRATINI": 60, "FEEBAS": 30, "BELDUM": 40})
+        self.assertEqual(read, [["shots/feebas.png"]])
+        self.assertEqual(len(asked), 3)
+        self.assertIn("Dratini candy (Dragonair → Dragonite needs 100): ", asked)
+        self.assertIn("4 families need a candy count", said[0])
+
+    def test_a_screenshot_without_that_candy_asks_again(self):
+        data, _ = apply_evolvenew(scanned("DRAGONAIR"), SPECIES)
+        replies = iter(["wrong.png", "75"])
+        said = []
+        answers = ask_for_candy(inventory_from_dict(data), SPECIES, ask=lambda _: next(replies),
+                                read=lambda _: {"MAGIKARP": 12}, say=said.append)
+        self.assertEqual(answers, {"DRATINI": 75})
+        self.assertIn("no Dratini candy count on that screenshot", said[1])
+
+    def test_end_of_input_stops_asking(self):
+        data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS"), SPECIES)
+        replies = iter(["60"])
+
+        def ask(_):
+            return next(replies)   # then StopIteration -> EOFError below
+
+        def ask_until_eof(prompt):
+            try:
+                return ask(prompt)
+            except StopIteration:
+                raise EOFError from None
+        answers = ask_for_candy(inventory_from_dict(data), SPECIES, ask=ask_until_eof,
+                                read=lambda _: {}, say=lambda _: None)
+        self.assertEqual(answers, {"DRATINI": 60})
 
     def test_candy_and_item_arguments(self):
         self.assertEqual(candy_overrides(["Dragonair=60"], SPECIES), {"DRATINI": 60})   # name -> its family
@@ -162,6 +238,19 @@ class EvolvenewTests(unittest.TestCase):
             self.assertIn("Dragonair → Dragonite  +30 Rare Candy", stdout.getvalue())
             self.assertIn("Gengar", stdout.getvalue())
             self.assertEqual(json.loads(out.read_text())["candy"], {"DRATINI": 70})   # typed count wins
+
+            # in a terminal, it asks for the missing count and plans with the answer
+            stdout = io.StringIO()
+            no_candy = scanned("DRAGONAIR", "GENGAR")
+            with mock.patch("pogo_evo_planner.scan.pipeline.scan", return_value=(no_candy, report)), \
+                    mock.patch("sys.stdin.isatty", return_value=True), \
+                    mock.patch("builtins.input", return_value="80"), \
+                    contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                cli.main(args + ["--rare-candy", "50"])
+            text = stdout.getvalue()
+            self.assertIn("Dragonair → Dragonite  +20 Rare Candy", text)
+            self.assertIn("To skip the questions next time: --candy DRATINI=80", text)
+            self.assertEqual(json.loads(out.read_text())["candy"], {"DRATINI": 80})
 
 
 if __name__ == "__main__":
