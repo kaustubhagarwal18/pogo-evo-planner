@@ -99,6 +99,7 @@ class KnownSpecies(Validator):
     """The name matches a species in the game data (after the same fuzzy matching OCR text gets)."""
 
     def _validate(self, value: Any, metadata: dict) -> PassResult | FailResult:
+        """Pass when the name, after fuzzy matching, is a species in the game data."""
         if value is None or metadata["matcher"].match(value):
             return PassResult()
         return FailResult(error_message=f"{value!r} is not a known species")
@@ -109,6 +110,7 @@ class KnownDexNumber(Validator):
     """The Pokédex number belongs to a species in the game data."""
 
     def _validate(self, value: Any, metadata: dict) -> PassResult | FailResult:
+        """Pass when the number belongs to a species in the game data."""
         if value in metadata["matcher"].by_dex:
             return PassResult()
         return FailResult(error_message=f"#{value} is not a known Pokédex number")
@@ -119,10 +121,12 @@ class InRange(Validator):
     """A count or CP is within what the game allows; null (unreadable) passes."""
 
     def __init__(self, low: int, high: int, **kwargs):
+        """Keep the allowed range, low to high inclusive."""
         super().__init__(low=low, high=high, **kwargs)
         self.low, self.high = low, high
 
     def _validate(self, value: Any, metadata: dict) -> PassResult | FailResult:
+        """Pass when the value is null (unreadable) or within the range."""
         if value is None or self.low <= value <= self.high:
             return PassResult()
         return FailResult(error_message=f"{value} is outside {self.low}-{self.high}")
@@ -133,6 +137,7 @@ class ScreenComplete(Validator):
     """A bag or detail reading has the number that screen exists for."""
 
     def _validate(self, value: Any, metadata: dict) -> PassResult | FailResult:
+        """Fail a bag reading without Rare Candy, or a detail reading without a species."""
         if value.get("kind") == "bag" and value.get("rare_candy") is None:
             return FailResult(error_message="a bag screen with no Rare Candy count")
         if value.get("kind") == "detail" and not value.get("species"):
@@ -208,6 +213,7 @@ class Claude:
     workers = 4
 
     def __init__(self, model: str = CLAUDE_MODEL, client: Any = None):
+        """Use the given client, or one built from the Anthropic credentials in the environment."""
         import anthropic
         self.model = model
         self.client: Any = client if client is not None else anthropic.Anthropic()  # Any: tests pass a fake
@@ -254,6 +260,7 @@ class Ollama:
     workers = 1  # Ollama answers one request at a time unless OLLAMA_NUM_PARALLEL is raised
 
     def __init__(self, model: str = OLLAMA_MODEL, client: Any = None):
+        """Use the given client, or one for the local Ollama server (OLLAMA_HOST picks another)."""
         import ollama
         self.model = model
         self.client: Any = client if client is not None else ollama.Client()  # OLLAMA_HOST picks another server
@@ -356,6 +363,7 @@ def read_screens(frames: list[tuple[str, np.ndarray]], matcher: SpeciesMatcher, 
     model = model or make_model("llm")
 
     def one(img: np.ndarray) -> ScreenResult:
+        """Read one frame with the model and turn the checked reading into a screen result."""
         # a guard per frame, so threads don't share one
         reading, notes = read_reading(img, model, build_guard(), matcher)
         res = to_screen_result(reading, matcher, species) if reading else ScreenResult("unknown")

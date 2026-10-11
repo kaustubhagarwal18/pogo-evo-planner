@@ -22,6 +22,7 @@ SPECIES = load_species(ROOT / "pogo_evo_planner/data/species_sample.json")
 
 
 def reading(**fields):
+    """A ScreenReading with every field empty except the ones given."""
     base = {"kind": "other", "rare_candy": None, "species": None, "candy_name": None, "candy": None,
             "evolve_sprite": "none", "specimens": [], "pokedex": []}
     return llm.ScreenReading.model_validate({**base, **fields})
@@ -31,11 +32,13 @@ class FakeClient:
     """Stands in for anthropic.Anthropic(): returns queued readings and records each request."""
 
     def __init__(self, *readings, stop_reason="end_turn"):
+        """Queue the readings to return, and the stop reason to report."""
         self.queue, self.calls = list(readings), []
         self.stop_reason = stop_reason
         self.beta = SimpleNamespace(messages=SimpleNamespace(parse=self.parse))
 
     def parse(self, **kwargs):
+        """Record the request and return the next queued reading, like the SDK's parse."""
         self.calls.append(kwargs)
         r = self.queue.pop(0) if self.queue else None
         block = SimpleNamespace(model_dump=lambda **_: {"type": "text", "text": r.model_dump_json() if r else ""})
@@ -46,9 +49,11 @@ class FakeOllama:
     """Stands in for ollama.Client(): returns queued JSON replies and records each request."""
 
     def __init__(self, *replies):
+        """Queue the JSON replies to return."""
         self.queue, self.calls = list(replies), []
 
     def chat(self, **kwargs):
+        """Record the request and return the next queued reply, like ollama.Client.chat."""
         self.calls.append(kwargs)
         return SimpleNamespace(message=SimpleNamespace(content=self.queue.pop(0)))
 
@@ -59,14 +64,17 @@ IMG = np.zeros((40, 20, 3), np.uint8)
 @unittest.skipUnless(llm, "needs the llm extras: pip install -e '.[llm]'")
 class ClaudeScanTests(unittest.TestCase):
     def setUp(self):
+        """A species matcher for the sample species table."""
         self.m = SpeciesMatcher(SPECIES)
 
     def read(self, client):
+        """Read the test frame with the client (Claude, unless it's an Ollama model) and convert it."""
         model = client if isinstance(client, llm.Ollama) else llm.Claude(client=client)
         found, notes = llm.read_reading(IMG, model, llm.build_guard(), self.m)
         return (llm.to_screen_result(found, self.m, SPECIES) if found else None), notes
 
     def test_request_shape(self):
+        """The Claude request uses claude-opus-5-5, the reading schema, the fallback and the frame."""
         client = FakeClient(reading(kind="bag", rare_candy=150))
         self.read(client)
         call = client.calls[0]
@@ -76,12 +84,14 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual(call["messages"][0]["content"][0]["type"], "image")
 
     def test_bag_and_fuzzy_species_names(self):
+        """A bag reading gives Rare Candy; a misspelt storage name is fuzzy-matched to its species."""
         res, notes = self.read(FakeClient(reading(kind="bag", rare_candy=150)))
         self.assertEqual((res.kind, res.rare_candy, notes), ("bag", 150, []))
         res, _ = self.read(FakeClient(reading(kind="storage", specimens=[{"name": "Dragonalr", "cp": 1500}])))
         self.assertEqual(res.specimens, [("DRAGONAIR", 1500)])
 
     def test_retry_uses_the_corrected_reading(self):
+        """A rejected CP triggers one retry with the failures, and the corrected reading is used."""
         bad = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 99999}])
         good = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 999}])
         client = FakeClient(bad, good)
@@ -93,6 +103,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertNotIn("parsed_output", retry[1]["content"][0])
 
     def test_values_still_failing_after_the_retry_are_dropped(self):
+        """Values still failing after the retry are dropped, each with a note; the rest is kept."""
         bad = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 500}, {"name": "Notamon", "cp": 500},
                                                  {"name": "Feebas", "cp": 99999}])
         res, notes = self.read(FakeClient(bad, bad))
@@ -103,6 +114,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertIn("no Rare Candy count", notes[0])
 
     def test_detail_page_candy_and_evolve_button(self):
+        """A detail reading gives family candy and, for a single evolution, its caught status."""
         res, _ = self.read(FakeClient(reading(kind="detail", species="Dratini", candy_name="DRATINI", candy=60,
                                               evolve_sprite="silhouette")))
         self.assertEqual(res.candy, {"DRATINI": 60})
@@ -113,6 +125,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual((res.dex_caught, res.dex_not_caught), (set(), set()))
 
     def test_pokedex_entries(self):
+        """Pokédex entries become caught or seen only; an unknown dex number is dropped with a note."""
         entries = [{"number": 147, "caught": True}, {"number": 148, "caught": False},
                    {"number": 99999, "caught": True}]
         res, notes = self.read(FakeClient(*[reading(kind="pokedex", pokedex=entries)] * 2))
@@ -120,18 +133,22 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual(len(notes), 1)
 
     def test_refusal_gives_no_reading(self):
+        """A refused request gives no reading and a note saying why."""
         res, notes = self.read(FakeClient(stop_reason="refusal"))
         self.assertIsNone(res)
         self.assertIn("refusal", notes[0])
 
     def test_missing_credentials_is_a_clear_error(self):
+        """No Claude credentials gives a one-line error naming ANTHROPIC_API_KEY, not a traceback."""
         def no_auth(**_):
+            """Fail the way the SDK does when no credentials are configured."""
             raise TypeError('"Could not resolve authentication method. Expected one of api_key ..."')
         client = SimpleNamespace(beta=SimpleNamespace(messages=SimpleNamespace(parse=no_auth)))
         with self.assertRaisesRegex(ValueError, "ANTHROPIC_API_KEY"):
             llm.read_screens([("a", IMG)], self.m, SPECIES, llm.Claude(client=client))
 
     def test_validation_makes_no_network_calls(self):
+        """Guardrails validation resolves no hostnames: its telemetry is switched off."""
         # Guardrails sends usage telemetry by default; the backend must switch it off
         lookups = []
         real = socket.getaddrinfo
@@ -143,6 +160,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual(lookups, [])
 
     def test_pipeline_reads_frames_in_order_and_caps_paid_frames(self):
+        """Too many frames for Claude is refused; frames are read and reported in order."""
         with tempfile.TemporaryDirectory() as d:
             paths = [str(Path(d) / f"{i}.png") for i in range(2)]
             for p in paths:
@@ -158,6 +176,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual(seen, [("a", "bag"), ("b", "storage")])
 
     def test_ollama_is_the_default_llm(self):
+        """--ocr llm means Ollama with qwen3-vl:4b; Claude only when named."""
         self.assertIsInstance(llm.make_model("llm"), llm.Ollama)
         self.assertIsInstance(llm.make_model("ollama"), llm.Ollama)
         self.assertEqual(llm.make_model("llm").model, "qwen3-vl:4b")
@@ -165,6 +184,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertIsInstance(llm.make_model("claude"), llm.Claude)  # paid: only when asked for by name
 
     def test_ollama_request_and_reading(self):
+        """The Ollama request has the schema, a system prompt and the frame as PNG bytes."""
         fake = FakeOllama(reading(kind="bag", rare_candy=42).model_dump_json())
         res, notes = self.read(llm.Ollama(client=fake))
         self.assertEqual((res.rare_candy, notes), (42, []))
@@ -175,6 +195,7 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertEqual(call["messages"][1]["images"][0][:4], b"\x89PNG")
 
     def test_ollama_retry_and_unusable_reply(self):
+        """Ollama retries like Claude, and a reply that doesn't fit the schema gives a note."""
         bad = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 99999}]).model_dump_json()
         good = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 999}]).model_dump_json()
         fake = FakeOllama(bad, good)
@@ -186,12 +207,15 @@ class ClaudeScanTests(unittest.TestCase):
         self.assertIn("doesn't fit the schema", notes[0])
 
     def test_ollama_setup_errors_are_clear(self):
+        """Ollama not running, or a model not downloaded, each give a one-line error saying what to run."""
         import ollama
 
         def down(**_):
+            """Fail the way the Ollama client does when the server isn't running."""
             raise ConnectionError("Failed to connect to Ollama")
 
         def missing(**_):
+            """Fail the way the Ollama client does when the model isn't downloaded."""
             raise ollama.ResponseError("model not found", 404)
 
         for chat, message in ((down, "ollama serve"), (missing, "ollama pull qwen3-vl:4b")):

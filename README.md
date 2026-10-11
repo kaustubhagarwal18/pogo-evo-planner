@@ -12,8 +12,20 @@
 ![RapidFuzz 3.14](https://img.shields.io/badge/RapidFuzz-3.14-blue)
 ![Tesseract 5.5](https://img.shields.io/badge/Tesseract-5.5_%28fallback%29-lightgrey)
 
+![Anthropic SDK 1.13](https://img.shields.io/badge/Anthropic_SDK-1.13-D97757?logo=anthropic&logoColor=white)
+![Ollama 0.6](https://img.shields.io/badge/Ollama-0.6_%28qwen3--vl%3A4b%29-black?logo=ollama&logoColor=white)
+![Guardrails AI 0.10](https://img.shields.io/badge/Guardrails_AI-0.10-6E56CF)
+![Pydantic 2.14](https://img.shields.io/badge/Pydantic-2.14-E92063?logo=pydantic&logoColor=white)
+
+![pylint 4.1](https://img.shields.io/badge/pylint-4.1-2A5ADA)
+![mypy 2.4](https://img.shields.io/badge/mypy-2.4-1F5082)
+![bandit 1.9](https://img.shields.io/badge/bandit-1.9-yellow)
+![gitleaks 8.30](https://img.shields.io/badge/gitleaks-8.30-red)
+
 Tells a Pokémon GO player which evolutions to do and where their Rare Candy saves the
 most effort, from screenshots and a screen recording of their own game.
+
+![Dashboard: 304 of 305 Rare Candy, ranked by value per Rare Candy, with the evolution order](docs/dashboard.png)
 
 ```
 screenshot of item bag ─┐                                         ┌─► text report
@@ -213,9 +225,7 @@ Dratini family: 100 candy (60 owned + 40 rare) - saves ~200 km of buddy walking
 
 The dashboard for a real player, built with `evolvenew` from one screen recording of the
 `evolvenew` results (210 Pokémon), three Pokédex "Seen" screenshots, the candy counts typed in
-when asked, and the apples from one detail page:
-
-![Dashboard: 304 of 305 Rare Candy, ranked by value per Rare Candy, with the evolution order](docs/dashboard.png)
+when asked, and the apples from one detail page. It's the picture at the top of this README.
 
 | Use Rare Candy (best use first) | Rare Candy | Candy needed (owned + Rare) |
 |---|---|---|

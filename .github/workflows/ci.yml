@@ -20,7 +20,7 @@ jobs:
       - name: Pylint
         run: |
           pylint pogo_evo_planner
-          pylint tests --disable=missing-function-docstring,duplicate-code
+          pylint tests --disable=duplicate-code
       - name: Mypy
         run: mypy pogo_evo_planner
       - name: Bandit (security)
