@@ -6,10 +6,12 @@ The README's "How it works" section is the short version; this is the long one.
 
 ```mermaid
 flowchart LR
-    subgraph scan["scan/ (OCR)"]
+    subgraph scan["scan/"]
         F[frames.py<br/>sample video, pick sharp frames] --> O[ocr.py<br/>word boxes]
         O --> S[screens.py<br/>classify + parse each screen]
         S --> M[pipeline.merge<br/>vote across frames]
+        F -.->|optional LLM reader| L[llm.py<br/>vision LLM reads the screen,<br/>Guardrails checks it]
+        L --> M
     end
     M --> J[(inventory.json<br/>review / edit by hand)]
     G[(data/latest.json<br/>game master)] --> P
@@ -18,6 +20,11 @@ flowchart LR
     P --> R[cli.render<br/>text report]
     P --> D[dashboard.build_view<br/>HTML]
 ```
+
+OCR (`ocr.py` + `screens.py`) is the default reader. The optional LLM readers in `llm.py` replace
+both steps: a local model through Ollama (the default LLM, free) or Claude (paid) returns a
+structured reading per frame, which Guardrails AI checks before it becomes the same per-screen
+result the OCR parsers produce. Merging is the same either way.
 
 Every arrow after `inventory.json` is deterministic and runs in about a second, so the
 planner can be re-run after hand edits without rescanning.
@@ -138,12 +145,14 @@ Worked examples from a real scan (all rarity tier common, multiplier 1):
 | Family | Evolution | Candy spent | Target owned? | Registered? | Value |
 |---|---|---|---|---|---|
 | Nacli | Naclstack → Garganacl | 100 | no | no (silhouette) | 125 × 5 + 20 = **645** |
-| Dreepy | Drakloak → Dragapult | 100 | no | yes | 125 × 5 = **625** |
+| Dreepy | Drakloak → Dragapult | 100 | no | no (fixed by hand) | 125 × 5 + 20 = **645** |
 | Toedscool | Toedscool → Toedscruel | 50 | no | no (silhouette) | 50 × 3 + 20 = **170** |
 | Clobbopus | Clobbopus → Grapploct | 50 | no | yes | 50 × 3 = **150** |
 
 Garganacl spends 100 candy but is valued at 125, because reaching it from Nacli would cost
-125.
+125. Grapploct is registered but not owned, so it earns the species value without the Pokédex
+bonus. The scan had marked Dragapult as caught from an Evolve button, but the player never caught
+one, so it was removed from the Pokédex list by hand; it now earns the bonus too.
 
 ## 4. Ranking: choosing what to evolve
 
@@ -218,6 +227,7 @@ evolved", "Not planned", "Not in species data", or "Probably misread" (in storag
 |---|---|
 | frame sampling | [`scan/frames.py`](../pogo_evo_planner/scan/frames.py) |
 | screen parsing, Evolve-button and Pokédex colour tests | [`scan/screens.py`](../pogo_evo_planner/scan/screens.py) |
+| LLM readers (Ollama, Claude) and their Guardrails checks | [`scan/llm.py`](../pogo_evo_planner/scan/llm.py) |
 | merging frames, scan warnings | [`scan/pipeline.py`](../pogo_evo_planner/scan/pipeline.py) |
 | owned / registered sets, valuation, DP, knapsack | [`planner.py`](../pogo_evo_planner/planner.py) |
 | game master parsing | [`gamemaster.py`](../pogo_evo_planner/gamemaster.py) |

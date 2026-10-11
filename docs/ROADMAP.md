@@ -9,6 +9,11 @@
 - [x] Merge with voting, conflict and gap warnings
 - [x] Tests: brute-force-checked planner, parser unit tests, end-to-end on synthetic screens
 - [x] Packaging, Makefile, CI
+- [x] Linters and secret scanning in CI and `make lint`: ruff, pylint, mypy, bandit, codespell,
+      gitleaks over the full git history
+- [x] Dashboard: Pokémon sprites and artwork (PokeAPI), a "New" tag on evolutions that add a
+      Pokédex entry, an inventory filter
+- [ ] README version badges are typed by hand; update them with dependency upgrades
 
 ## Phase 2: Calibrate on real captures (next)
 
@@ -40,12 +45,17 @@ Next from that recording:
       is still fading in (Pawmo). Both were outvoted by other frames here; a green species seen on
       only one frame could still slip through. Ideas: skip frames where the sprite is unusually
       small, and require two frames to agree on "never caught"
+- [ ] The opposite misread: Dragapult was read as **caught** (colour on the Evolve button) although
+      the player never caught one; it had to be removed from the Pokédex list by hand. Because one
+      colour frame outvotes any number of silhouettes, a false "caught" can't be outvoted. Weigh
+      the votes instead of letting colour always win
 - [ ] Red candy cost on the Evolve row means "can't afford": use it to sanity-check candy counts
 - [ ] CP-to-name pairing in the storage grid: names get the CP of a neighbouring cell
       (4 Zacian and 3 Zamazenta carrying other Pokémon's CPs, a Kubfu with Kleavor's CP)
 - [ ] Some detail pages read no candy count (Greavard); find out why
-- [ ] End-to-end synthetic test fails with RapidOCR (Feebas and Chansey candy unread); it passes
-      the CI path, which uses Tesseract. Already failing at the initial commit
+- [ ] End-to-end synthetic test fails with RapidOCR on macOS (RapidOCR 3.9, PP-OCRv6 models:
+      Feebas and Chansey candy unread). It passes with Tesseract, and in CI's RapidOCR job on
+      Linux. Already failing at the initial commit
 - [ ] Scan speed: cache OCR per frame and merge batch recordings into one inventory, drop scroll
       frames that mostly overlap, collapse detail pages whose 3D model keeps animating
 
@@ -54,10 +64,24 @@ Next from that recording:
 - [ ] Store them under `tests/real/` with hand-labelled ground truth JSON (blur trainer names)
 - [ ] Measure per-field accuracy; tune OCR passes, thresholds (frame diff, Pokédex
       saturation, CP-to-name pairing) and the fuzzy-match cutoff
-- [ ] Nicknamed Pokémon: fall back to the species line on the detail page, or sprite matching
+- [ ] Nicknamed Pokémon: fall back to the species line on the detail page, or sprite matching.
+      The LLM readers are asked to identify the species from the sprite (untested)
 - [ ] Read evolution items from the bag too (Metal Coat, Sinnoh Stone, lures…)
 - [ ] Regional forms (Alolan, Galarian…) in names and the species table
 - [ ] Non-English game languages (OCR language + localised species names)
+
+### LLM screen readers
+
+- [x] `--ocr llm` / `ollama` (local, free; default LLM) and `--ocr claude` (paid API) read frames
+      as images and return a structured reading; Guardrails AI checks every value, with one retry
+      and its usage telemetry switched off. Tests use fake clients
+- [ ] First real run: install Ollama on an 8 GB Mac and measure `qwen3-vl:4b` against OCR for
+      accuracy and seconds per frame
+- [ ] Measure both readers and OCR per field on the hand-labelled captures above, and the real
+      cost per frame for Claude, before recommending either
+- [ ] Hybrid: OCR first, an LLM only for frames OCR is unsure about (Evolve-button sprite,
+      conflicting CPs, missing candy counts), to cut time and cost
+- [ ] Claude Batch API for long recordings (half price, results arrive later)
 
 ## Phase 3: Better recommendations
 
@@ -65,6 +89,11 @@ Next from that recording:
 - [x] Collection-first value: only evolutions into a species you don't have count (owning a later
       stage covers earlier ones), the cheapest owned stage is evolved, and Rare Candy never pays
       for a repeat or gets spent just to use it up
+- [x] One Pokémon planned per species (IVs ignored), so a later middle stage is never dropped;
+      branching lines (Eevee, Kirlia, Charcadet) keep one copy per final evolution not owned yet
+- [ ] Known limits of that rule: with `--repeat-value` above 0, extra copies of a species are no
+      longer considered for repeat evolutions; a family with many unowned branches (8+ Eevees
+      and lures, no Eeveelutions) takes about 6 s to plan
 - [ ] Value model options: raid/PvP usefulness (PvPoke data), XP with Lucky Egg
 - [ ] Candy XL, shadow/purified, trade discounts
 - [ ] "What-if" view: how many km or catches until the next evolution without Rare Candy

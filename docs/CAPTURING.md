@@ -26,12 +26,17 @@ Pause briefly on each screen: the scanner keeps the sharpest frame of each pause
 pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
 ```
 
+With an LLM reader (`--ocr llm`, or the paid `--ocr claude`), screenshots of the bag, storage
+and detail pages are the better input: each frame is one model request, so a recording's
+hundreds of frames are slow with Ollama and costly with Claude.
+
 Read the warnings it prints (missing families, conflicting readings), fix anything wrong
 in `inventory.json`, and add evolution items you hold under `"items"`, e.g.
 `{"ITEM_METAL_COAT": 2, "ITEM_SINNOH_STONE": 1}`.
 
 ## Privacy
 
-Recordings can show your trainer name, friends and location. Everything runs locally;
-`.gitignore` keeps `captures/`, `mock/` and `inventory.json` out of the repo. Crop or
+Recordings can show your trainer name, friends and location. Everything runs locally,
+including `--ocr llm` (Ollama), except `--ocr claude`, which sends each frame to Anthropic's
+API. `.gitignore` keeps `captures/`, `mock/` and `inventory.json` out of the repo. Crop or
 blur before sharing samples.

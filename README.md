@@ -76,7 +76,7 @@ See [docs/CAPTURING.md](docs/CAPTURING.md) for what to record.
 ## Example output
 
 ```
-Rare candy: using 150 of 150  (value score 13,392)
+Rare candy: using 150 of 150  (value score 14,367)
 
 == Spend rare candy on ==
 Feebas family: 100 candy (30 owned + 70 rare) - saves ~1,400 km of buddy walking
@@ -106,15 +106,17 @@ and detail pages (424 frames, 169 Pokémon read).
 |---|---|---|
 | 28 | Naclstack → Garganacl | 100 (72 + 28) |
 | 8 | Drakloak → Dragapult | 100 (92 + 8) |
-| 44 | Clobbopus → Grapploct | 50 (6 + 44) |
 | 34 | Toedscool → Toedscruel | 50 (16 + 34) |
 | 9 | Glimmet → Glimmora | 50 (41 + 9) |
+| 44 | Clobbopus → Grapploct | 50 (6 + 44) |
 | 0 | Kubfu → Urshifu, Charcadet → Ceruledge, Flittle → Espathra | own candy only |
 
 Every one is a species the player doesn't have yet; 182 Rare Candy is left unspent rather than
-used on repeats. The Evolve buttons confirm four of the targets were never caught (Garganacl,
-Glimmora, Toedscruel, Espathra). The scan's manual fixes before this result: removed a Kubfu
-that was really a Kleavor's CP, added three candy counts and the missing Maushold.
+used on repeats. Rows are in the dashboard's order, by plan value. The Evolve buttons confirm four
+of the targets were never caught (Garganacl, Glimmora, Toedscruel, Espathra). The scan's manual
+fixes before this result: removed a Kubfu that was really a Kleavor's CP, added three candy
+counts and the missing Maushold, and removed Dragapult from the Pokédex list (an Evolve button
+was read as caught, but the player never caught one).
 
 ## How it works
 
@@ -204,11 +206,15 @@ against real captures yet; the tests use fake clients.
   after that. A repeat evolution is worth
   nothing by default (`--repeat-value 0.1` keeps 10%, `1` turns the discount off). Species
   you own count as registered.
-- Per family, a DP over owned specimens and their evolution paths (multi-step, branched)
+- Only the first Pokémon of each species is planned for; later copies are dropped, and IVs
+  are ignored. A species whose line branches (Eevee, Kirlia, Charcadet) keeps one copy per
+  final evolution you don't own yet, so each copy can take a different branch.
+- Per family, a DP over those Pokémon and their evolution paths (multi-step, branched)
   gives (candy needed, items used, value) options. Across families, a grouped knapsack
   spends the Rare Candy and shared items (Metal Coat, Sinnoh Stone, lures) for maximum value.
 - Partial top-ups are never suggested: Rare Candy only pays off when it completes an
-  evolution. Trade evolutions are listed as "trade instead". Verified against brute force.
+  evolution. The text report lists trade evolutions as "trade instead". Verified against
+  brute force.
 
 ### Dashboard (`pogo_evo_planner/dashboard.py`)
 
@@ -235,8 +241,9 @@ MVP. The planner is solid. The scanner's automated tests use **synthetic** scree
 recording (576×1296 phone screen) found two problems, both fixed: unknown species being dropped
 with the sample data, and the wrapped Candy XL label being read as regular candy. It also led to
 the Evolve-button silhouette check. Expect more calibration on other phones; OCR still garbles
-some CP values and the storage grid sometimes pairs a name with a neighbouring cell's CP. See
-[docs/ROADMAP.md](docs/ROADMAP.md).
+some CP values and the storage grid sometimes pairs a name with a neighbouring cell's CP. The
+optional LLM readers (`--ocr llm` / `ollama` / `claude`) haven't been run on real captures yet,
+so their accuracy, speed and cost are unknown. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Development
 
