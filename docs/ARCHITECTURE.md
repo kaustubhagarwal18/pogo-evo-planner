@@ -64,24 +64,32 @@ flowchart TD
         ST[storage grid] -->|name + CP per cell| SP[specimens]
         DX[Pokédex] -->|sprite saturation p90 ≥ 55| C1[dex_caught]
         DX -->|else| SO[dex_seen_only]
-        EV[detail page Evolve button] -->|sprite in colour| C2[dex_caught]
-        EV -->|darker shade of the button's green| NC[dex_not_caught]
+        DS[Pokédex filtered to Seen] -->|every entry| NC2[dex_not_caught]
+        EV[detail page Evolve button] -->|sprite with shading and colours| C2[dex_caught]
+        EV -->|one flat tone darker than the button| NC[dex_not_caught]
     end
     SP --> MG[merge]
     C1 --> MG
     C2 --> MG
     SO --> MG
     NC --> MG
+    NC2 --> MG
     MG --> POK["pokemon: unique (species, CP)"]
-    MG --> PDX["pokedex = ∪ caught"]
-    MG --> NOT["not_caught = ∪ not_caught − pokedex"]
+    MG --> PDX["pokedex: more caught than never-caught frames"]
+    MG --> NOT["not_caught: more never-caught than caught frames"]
 ```
 
-- `screens.evolve_sprite_caught` checks the sprite left of the EVOLVE label: a silhouette
-  is a mid-dark green and never near-black, so a dark Pokémon in colour (Kilowattrel) still
-  counts as caught. It returns `None` (unknown) on the grey "can't afford" button.
-- `merge` lets one coloured reading anywhere beat any number of silhouettes
-  (`not_caught − caught`), so a single misread frame can't mark a species missing.
+- `screens.evolve_sprite_caught` judges the sprite left of the EVOLVE label against the button
+  around it, whatever the button's colour: it takes the button colour from the box (leaving out
+  the white page past the button's rounded end), keeps the pixels that differ, and measures how
+  much their lightness varies. A silhouette is one flat tone (≤ 7 on real buttons), a Pokémon in
+  colour has shading and highlights (≥ 15); the cut-off is 11. Fewer than 100 differing pixels
+  means the sprite hasn't loaded, and the answer is `None`. Checked against 39 real buttons
+  (`tests/real/evolve_buttons/`).
+- `screens.evolve_buttons` keeps only the capitalised EVOLVE label: not "evolve" in hint text
+  ("Adventure together to evolve") and not MEGA EVOLVE.
+- `merge` decides each species by majority: more caught than never-caught frames puts it in
+  `pokedex`, the reverse in `not_caught`, and a tie in neither (with a warning).
 - Storage cells are de-duplicated by `(species, CP)`. Cells read without a CP are counted
   per frame and only added beyond what CP-bearing cells already cover.
 - If a species is both in storage and in `not_caught`, the scan warns that the grid probably

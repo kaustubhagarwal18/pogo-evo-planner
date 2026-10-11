@@ -45,7 +45,9 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
     candy_votes: dict[str, Counter] = defaultdict(Counter)
     with_cp: set[tuple[str, int]] = set()
     no_cp: Counter = Counter()
-    caught, seen, not_caught = set(), set(), set()
+    seen: set[str] = set()
+    caught_votes: Counter = Counter()   # frames showing the species as caught (colour sprite, storage...)
+    never_votes: Counter = Counter()    # frames showing it as never caught (silhouette, "Seen" list)
     for r in results:
         for fam, n in r.candy.items():
             candy_votes[fam][n] += 1
@@ -57,9 +59,9 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
                 with_cp.add((sp, cp))
         for sp, n in frame_no_cp.items():  # can't de-duplicate across frames without CP
             no_cp[sp] = max(no_cp[sp], n)
-        caught |= r.dex_caught
+        caught_votes.update(r.dex_caught)
         seen |= r.dex_seen_only
-        not_caught |= r.dex_not_caught
+        never_votes.update(r.dex_not_caught)
         report.warnings.extend(r.notes)
 
     if len(rare) > 1:
@@ -69,6 +71,13 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
         if len(votes) > 1:
             report.warnings.append(f"conflicting {fam} candy readings {dict(votes)}; using the most common")
         candy[fam] = votes.most_common(1)[0][0]
+
+    # majority vote per species: a single misread frame (a sprite still loading, a green Pokémon on a
+    # green button) no longer decides on its own
+    caught = {sp for sp in caught_votes if caught_votes[sp] > never_votes[sp]}
+    not_caught = {sp for sp in never_votes if never_votes[sp] > caught_votes[sp]}
+    for sp in sorted(set(caught_votes) & set(never_votes) - caught - not_caught):
+        report.warnings.append(f"{sp}: as many frames show it caught as never caught; left out of both lists")
 
     pokemon = [{"species": sp, "cp": cp, "label": f"CP {cp}"} for sp, cp in sorted(with_cp)]
     covered = Counter(sp for sp, _ in with_cp)
@@ -81,8 +90,8 @@ def merge(results: list[ScreenResult], report: ScanReport) -> dict:
         "items": {},
         "pokedex": sorted(caught),
         "pokedex_seen_only": sorted(seen - caught),
-        # evolutions whose EVOLVE button shows a silhouette: never caught, so not in storage either
-        "not_caught": sorted(not_caught - caught),
+        # never caught: a silhouette on an EVOLVE button, or listed under the Pokédex "Seen" filter
+        "not_caught": sorted(not_caught),
         "pokemon": pokemon,
     }
 

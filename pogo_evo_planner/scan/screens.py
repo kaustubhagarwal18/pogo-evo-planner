@@ -197,28 +197,56 @@ def parse_bag(words: list[Word]) -> ScreenResult:
 def evolve_sprite_caught(img: np.ndarray, evolve: Word) -> bool | None:
     """Whether the sprite on an EVOLVE button is in colour (caught) or a silhouette (never caught).
 
-    A silhouette is a darker shade of the button's own green; a caught Pokémon's sprite has its
-    own hues and washed-out whites and greys. None when it can't tell: the grey button shown when
-    you can't afford the evolution isn't calibrated yet, and tiny or missing sprites are skipped.
+    The button's own colour varies (green, grey, pink, blue-grey) and says nothing about this, so the
+    sprite is judged against the button around it: a silhouette is one flat tone darker than the
+    button, while a caught Pokémon has shading, highlights and several colours. None when there is
+    no sprite to judge, e.g. a frame where it hasn't loaded yet.
     """
-    h, x0 = evolve.h, int(evolve.x - 0.8 * evolve.w)
-    box = img[max(0, int(evolve.cy - 1.4 * h)):int(evolve.cy + 1.4 * h), max(0, x0):int(evolve.x - 0.05 * evolve.w)]
+    h = evolve.h
+    box = img[max(0, int(evolve.cy - 1.4 * h)):int(evolve.cy + 1.4 * h),
+              max(0, int(evolve.x - 0.8 * evolve.w)):int(evolve.x - 0.05 * evolve.w)]
     if box.size == 0:
         return None
-    hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV).reshape(-1, 3).astype(float)
-    lab = cv2.cvtColor(box, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(float)
-    bright = hsv[:, 2] >= np.median(hsv[:, 2])   # the button fills the brighter half of the box
-    bg_hsv, bg_lab = np.median(hsv[bright], axis=0), np.median(lab[bright], axis=0)
-    if bg_hsv[1] < 60:
-        return None  # grey (unaffordable) button
-    sprite = hsv[np.abs(lab - bg_lab).sum(axis=1) > 30]
-    if len(sprite) < 200:
-        return None
-    hue_off = float((np.abs(sprite[:, 0] - bg_hsv[0]) > 12).mean())
-    washed_out = float((sprite[:, 1] < 0.5 * bg_hsv[1]).mean())
-    # silhouettes are a mid-dark green and never near-black; a dark sprite (Kilowattrel) is in colour
-    near_black = float((sprite[:, 2] < 80).mean())
-    return (hue_off + washed_out) / 2 >= 0.4 or near_black >= 0.05
+    lab = cv2.cvtColor(box, cv2.COLOR_BGR2LAB).astype(float)
+    flat = lab.reshape(-1, 3)
+    # the box can reach past the button's rounded end onto the white page; leave that out of the
+    # button colour, which is then the brighter half of what's left (sprites are mostly darker)
+    page = (flat[:, 0] > 232) & (np.abs(flat[:, 1:] - 128).max(axis=1) < 8)
+    rest = flat[~page] if (~page).sum() > 50 else flat
+    button = np.median(rest[rest[:, 0] >= np.median(rest[:, 0])], axis=0)
+    differs = (np.abs(lab - button).sum(axis=2) > 30).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(differs, connectivity=8)
+    height, width = differs.shape
+    sprite = np.zeros(differs.shape, bool)
+    for i in range(1, n):
+        x, y, w, hh, area = stats[i]
+        part = lab[labels == i]
+        on_edge = x == 0 or y == 0 or x + w == width or y + hh == height
+        page_like = np.median(part[:, 0]) > button[0] + 8 and np.median(np.abs(part[:, 1:] - 128)) < 10
+        if area >= 15 and not (on_edge and page_like):
+            sprite |= labels == i
+    if sprite.sum() < 100:
+        return None  # no sprite yet (still loading, under 20 px on real frames), or too small to judge
+    core = cv2.erode(sprite.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    px = lab[core] if core.sum() > 50 else lab[sprite]   # without the anti-aliased rim
+    # real buttons: silhouettes vary by at most ~7 in lightness, Pokémon in colour by 15 or more
+    if px[:, 0].std() >= 11:
+        return True
+    return False if np.median(px[:, 0]) < button[0] else None
+
+
+def evolve_buttons(words: list[Word]) -> list[Word]:
+    """The EVOLVE button labels on a detail screen.
+
+    Leaves out "evolve" in hint text ("Adventure together to evolve"), which isn't in capitals, and
+    MEGA EVOLVE buttons, whose sprite is a Mega Evolution rather than the next species.
+    """
+    def mega(e: Word) -> bool:
+        """True when MEGA sits just left of the label or stacked just above it."""
+        return any(norm(w.text) == "MEGA" and (_same_line(w, e) and w.x < e.x
+                                               or 0 <= e.y - (w.y + w.h) < e.h and abs(w.cx - e.cx) < e.w)
+                   for w in words)
+    return [w for w in words if norm(w.text) == "EVOLVE" and w.text.strip().isupper() and not mega(w)]
 
 
 def _screen_species(words: list[Word], m: SpeciesMatcher) -> str | None:
@@ -235,7 +263,7 @@ def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
     Only species with a single evolution are read, since branched ones show several buttons.
     """
     r = ScreenResult("detail")
-    evolves = [w for w in words if norm(w.text) == "EVOLVE"]
+    evolves = evolve_buttons(words)
     sp = _screen_species(words, m) if img is not None and len(evolves) == 1 else None
     evos = species.get(sp, {}).get("evolutions", []) if sp else []
     if len(evos) == 1 and img is not None:
@@ -245,23 +273,39 @@ def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
     for line in _lines(words):
         ups = [norm(w.text) for w in line]
         for i, u in enumerate(ups):
-            if u != "CANDY" or i == 0 or (i + 1 < len(ups) and ups[i + 1] == "XL"):
+            if u != "CANDY" or (i + 1 < len(ups) and ups[i + 1] == "XL"):
                 continue
-            # the family name may be one or two words before CANDY
-            for n in (1, 2):
-                if i - n < 0:
-                    break
-                sp = m.match(" ".join(w.text for w in line[i - n:i]))
-                if sp:
-                    if _xl_below(words, line[i - n:i + 1]):
-                        break
-                    count = _number_above(words, line[i - n:i + 1])
-                    if count is not None:
-                        r.candy[species[sp]["family"]] = count
-                    else:
-                        r.notes.append(f"{sp} candy label found but no count above it")
-                    break
+            label = _candy_label(words, line, i, m)
+            if label is None:
+                continue
+            sp, anchor = label
+            if _xl_below(words, anchor):
+                continue
+            count = _number_above(words, anchor)
+            if count is not None:
+                r.candy[species[sp]["family"]] = count
+            else:
+                r.notes.append(f"{sp} candy label found but no count above it")
     return r
+
+
+def _candy_label(words: list[Word], line: list[Word], i: int, m: SpeciesMatcher) -> tuple[str, list[Word]] | None:
+    """The species named in "<FAMILY> CANDY" for the CANDY at line[i], and the label's words.
+
+    The name is one or two words before CANDY, or, when a long name wraps ("GREAVARD" above "CANDY"),
+    on the line just above it.
+    """
+    for n in (1, 2):
+        if i - n < 0:
+            break
+        sp = m.match(" ".join(w.text for w in line[i - n:i]))
+        if sp:
+            return sp, line[i - n:i + 1]
+    candy = line[i]
+    above = sorted((w for w in words if 0 <= candy.y - (w.y + w.h) < candy.h
+                    and w.x < candy.x + candy.w and w.x + w.w > candy.x), key=lambda w: w.x)
+    sp = m.match(" ".join(w.text for w in above)) if above else None
+    return (sp, above + [candy]) if sp else None
 
 
 def parse_storage(words: list[Word], m: SpeciesMatcher) -> ScreenResult:
@@ -297,15 +341,29 @@ def parse_storage(words: list[Word], m: SpeciesMatcher) -> ScreenResult:
 
 def parse_pokedex(words: list[Word], img: np.ndarray | None, m: SpeciesMatcher,
                   sat_threshold: float = 55.0) -> ScreenResult:
-    """Read dex numbers, marking each entry caught or seen-only by its sprite's colour saturation."""
+    """Read dex numbers, marking each entry caught or seen-only by its sprite's colour saturation.
+
+    With the Pokédex filtered to "Seen", every entry shown has been seen but never caught.
+    """
     r = ScreenResult("pokedex")
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) if img is not None else None
+    # entries sit below the POKEDEX title; above it is the phone's status bar (time, battery), and on
+    # the title line the "Caught: 893" count, neither of which are dex numbers
+    titles = [w for w in words if norm(w.text) == "POKEDEX"]
+    top = max(w.y + w.h for w in titles) if titles else 0
+    seen_filter = any(norm(w.text) == "SEEN" for w in words)
     for w in words:
-        d = _DEX_NUM.match(w.text.strip())
-        if not d or not w.text.strip()[0] in "#0123456789N":
+        text = w.text.strip()
+        d = _DEX_NUM.match(text)
+        if not d or w.y < top or not text[0] in "#0123456789N":
             continue
+        if text.isdigit() and len(text) != 4:
+            continue  # bare entry numbers are zero-padded to four digits (0841, 1000)
         sp = m.by_dex.get(int(d.group(1)))
         if not sp:
+            continue
+        if seen_filter:
+            r.dex_not_caught.add(sp)
             continue
         if hsv is None:
             r.dex_caught.add(sp)

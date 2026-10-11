@@ -1,0 +1,353 @@
+{
+ "rec_clobbopus": {
+  "label_box": [
+   137,
+   43,
+   109,
+   32
+  ],
+  "expected": "unknown"
+ },
+ "rec_drakloak": {
+  "label_box": [
+   138,
+   42,
+   109,
+   34
+  ],
+  "expected": "unknown"
+ },
+ "rec_dreepy": {
+  "label_box": [
+   137,
+   43,
+   108,
+   34
+  ],
+  "expected": "unknown"
+ },
+ "rec_fidough": {
+  "label_box": [
+   136,
+   36,
+   112,
+   36
+  ],
+  "expected": "caught"
+ },
+ "rec_flittle": {
+  "label_box": [
+   137,
+   41,
+   111,
+   37
+  ],
+  "expected": "never caught"
+ },
+ "rec_frigibax": {
+  "label_box": [
+   138,
+   42,
+   109,
+   34
+  ],
+  "expected": "caught"
+ },
+ "rec_fuecoco": {
+  "label_box": [
+   137,
+   36,
+   111,
+   36
+  ],
+  "expected": "caught"
+ },
+ "rec_glimmet": {
+  "label_box": [
+   137,
+   43,
+   110,
+   33
+  ],
+  "expected": "never caught"
+ },
+ "rec_greavard": {
+  "label_box": [
+   135,
+   34,
+   116,
+   40
+  ],
+  "expected": "caught"
+ },
+ "rec_hatenna": {
+  "label_box": [
+   137,
+   42,
+   108,
+   33
+  ],
+  "expected": "unknown"
+ },
+ "rec_lechonk": {
+  "label_box": [
+   136,
+   35,
+   112,
+   37
+  ],
+  "expected": "caught"
+ },
+ "rec_nacli": {
+  "label_box": [
+   137,
+   38,
+   111,
+   34
+  ],
+  "expected": "caught"
+ },
+ "rec_naclstack": {
+  "label_box": [
+   137,
+   41,
+   110,
+   35
+  ],
+  "expected": "never caught"
+ },
+ "rec_pawmi": {
+  "label_box": [
+   137,
+   42,
+   110,
+   34
+  ],
+  "expected": "caught"
+ },
+ "rec_poltchageist": {
+  "label_box": [
+   137,
+   42,
+   110,
+   34
+  ],
+  "expected": "unknown"
+ },
+ "rec_quaxly": {
+  "label_box": [
+   137,
+   43,
+   110,
+   34
+  ],
+  "expected": "caught"
+ },
+ "rec_quaxwell": {
+  "label_box": [
+   138,
+   43,
+   108,
+   33
+  ],
+  "expected": "caught"
+ },
+ "rec_sinistea": {
+  "label_box": [
+   137,
+   42,
+   109,
+   34
+  ],
+  "expected": "unknown"
+ },
+ "rec_smoliv": {
+  "label_box": [
+   136,
+   42,
+   110,
+   34
+  ],
+  "expected": "caught"
+ },
+ "rec_sprigatito": {
+  "label_box": [
+   138,
+   43,
+   108,
+   33
+  ],
+  "expected": "caught"
+ },
+ "rec_tadbulb": {
+  "label_box": [
+   137,
+   43,
+   109,
+   32
+  ],
+  "expected": "caught"
+ },
+ "rec_tinkatink": {
+  "label_box": [
+   135,
+   42,
+   113,
+   35
+  ],
+  "expected": "caught"
+ },
+ "rec_tinkatuff": {
+  "label_box": [
+   137,
+   35,
+   111,
+   37
+  ],
+  "expected": "caught"
+ },
+ "rec_toedscool": {
+  "label_box": [
+   137,
+   42,
+   110,
+   34
+  ],
+  "expected": "never caught"
+ },
+ "rec_wattrel": {
+  "label_box": [
+   136,
+   34,
+   111,
+   38
+  ],
+  "expected": "caught"
+ },
+ "rec_cetoddle": {
+  "label_box": [
+   142,
+   41,
+   98,
+   24
+  ],
+  "expected": "caught"
+ },
+ "rec_morgrem": {
+  "label_box": [
+   140,
+   41,
+   99,
+   24
+  ],
+  "expected": "caught"
+ },
+ "rec_shroodle": {
+  "label_box": [
+   140,
+   41,
+   99,
+   24
+  ],
+  "expected": "caught"
+ },
+ "rec_tandemaus": {
+  "label_box": [
+   140,
+   41,
+   100,
+   24
+  ],
+  "expected": "caught"
+ },
+ "rec_tarountula": {
+  "label_box": [
+   142,
+   41,
+   98,
+   24
+  ],
+  "expected": "caught"
+ },
+ "rec_varoom": {
+  "label_box": [
+   139,
+   41,
+   100,
+   24
+  ],
+  "expected": "caught"
+ },
+ "shot_applin_1": {
+  "label_box": [
+   267,
+   70,
+   184,
+   41
+  ],
+  "expected": "never caught"
+ },
+ "shot_applin_2": {
+  "label_box": [
+   266,
+   75,
+   185,
+   44
+  ],
+  "expected": "never caught"
+ },
+ "shot_applin_3": {
+  "label_box": [
+   266,
+   75,
+   185,
+   44
+  ],
+  "expected": "never caught"
+ },
+ "shot_drakloak": {
+  "label_box": [
+   266,
+   79,
+   185,
+   46
+  ],
+  "expected": "never caught"
+ },
+ "shot_floette": {
+  "label_box": [
+   266,
+   75,
+   185,
+   44
+  ],
+  "expected": "never caught"
+ },
+ "shot_greavard": {
+  "label_box": [
+   266,
+   79,
+   185,
+   46
+  ],
+  "expected": "caught"
+ },
+ "shot_larvesta": {
+  "label_box": [
+   266,
+   75,
+   185,
+   44
+  ],
+  "expected": "never caught"
+ },
+ "shot_snom": {
+  "label_box": [
+   266,
+   75,
+   185,
+   44
+  ],
+  "expected": "never caught"
+ }
+}
