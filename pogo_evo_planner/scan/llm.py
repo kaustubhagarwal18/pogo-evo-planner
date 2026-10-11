@@ -1,23 +1,28 @@
-"""Read game screens with Claude (a vision LLM) instead of OCR, checked with Guardrails AI.
+"""Read game screens with a vision LLM instead of OCR, checked with Guardrails AI.
 
-`--ocr claude` sends each frame to the Claude API and asks for a structured reading of the screen
-(bag, Pokémon detail page, storage grid or Pokédex). Names are matched to the species table the
-same way OCR text is, and Guardrails AI checks every value (known species, plausible CP and candy
-counts, a bag screen that actually has a Rare Candy count). A value that fails is dropped with a
-note, and Claude gets one retry with the list of failures.
+Two models are supported:
 
-Unlike OCR, this sends your screenshots to Anthropic's API and costs money per frame. Guardrails'
-own usage telemetry is switched off: validation runs locally and sends nothing.
+- `--ocr claude`: Claude through the Anthropic API. The most capable, but paid per frame, and the
+  screenshots go to Anthropic. Needs ANTHROPIC_API_KEY (or a profile from `ant auth login`).
+- `--ocr ollama`: an open-weight model run locally by Ollama (https://ollama.com). Free, and
+  nothing leaves your machine, but small models read less accurately and are slow on a laptop.
 
-Needs the `llm` extras (`pip install -e '.[llm]'`) and Claude API credentials (ANTHROPIC_API_KEY,
-or a profile from `ant auth login`).
+Either way the model returns a structured reading of the screen (bag, Pokémon detail page, storage
+grid or Pokédex). Names are matched to the species table the same way OCR text is, and Guardrails
+AI checks every value (known species, plausible CP and candy counts, a bag screen that actually has
+a Rare Candy count). A value that fails is dropped with a note, and the model gets one retry with
+the list of failures. Guardrails' own usage telemetry is switched off: validation runs locally.
+
+Needs the `llm` extras: `pip install -e '.[llm]'`.
 """
 from __future__ import annotations
 
 import base64
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import cv2
@@ -25,14 +30,14 @@ import numpy as np
 from guardrails import Guard, OnFailAction
 from guardrails.settings import settings as _guardrails_settings
 from guardrails.validators import FailResult, PassResult, Validator, register_validator
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .screens import ScreenResult, SpeciesMatcher
 
-MODEL = "claude-opus-5-5"
-EFFORT = "medium"      # reading a screen isn't hard reasoning; raise it if readings come back wrong
-WORKERS = 4            # frames read in parallel
-REASKS = 1             # retries when Guardrails rejects part of a reading
+CLAUDE_MODEL = "claude-opus-5-5"
+CLAUDE_EFFORT = "medium"   # reading a screen isn't hard reasoning; raise it if readings come back wrong
+OLLAMA_MODEL = "qwen3-vl:4b"  # 3.3 GB download, fits an 8 GB Mac; qwen3-vl:2b is 1.9 GB, qwen3-vl:8b 6.1 GB
+REASKS = 1                 # retries when Guardrails rejects part of a reading
 
 
 def _guardrails_offline() -> None:
@@ -179,55 +184,131 @@ def drop_failures(reading: ScreenReading, failures: list[tuple[str, str]]) -> tu
     return ScreenReading.model_validate(data), notes
 
 
-# ---------- calling Claude ----------
+# ---------- the models ----------
 
-def _image_block(img: np.ndarray) -> dict:
-    """A frame as a base64 PNG image block (lossless, so small text stays sharp)."""
+def _png(img: np.ndarray) -> bytes:
+    """A frame as PNG bytes (lossless, so small text stays sharp)."""
     ok, png = cv2.imencode(".png", img)
     if not ok:
         raise ValueError("could not encode frame as PNG")
-    return {"type": "image", "source": {"type": "base64", "media_type": "image/png",
-                                        "data": base64.standard_b64encode(png.tobytes()).decode()}}
+    return png.tobytes()
 
 
-def _ask(client: Any, messages: list[dict]) -> Any:
-    """One structured-output request; server-side fallback answers if the model declines."""
-    return client.beta.messages.parse(
-        model=MODEL,
-        max_tokens=16000,
-        system=SYSTEM,
-        messages=messages,
-        output_format=ScreenReading,
-        output_config={"effort": EFFORT},
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    )
+@dataclass
+class Reply:
+    reading: ScreenReading | None   # None when the model gave no usable reading
+    turn: dict | None               # the model's message, sent back with the failures on a retry
+    problem: str | None = None      # why there's no reading
 
 
-def read_reading(img: np.ndarray, client: Any, guard: Guard, matcher: SpeciesMatcher,
+class Claude:
+    """Claude through the Anthropic API: paid per frame, and the frames leave your machine."""
+
+    workers = 4
+
+    def __init__(self, model: str = CLAUDE_MODEL, client: Any = None):
+        import anthropic
+        self.model = model
+        self.client: Any = client if client is not None else anthropic.Anthropic()  # Any: tests pass a fake
+
+    def start(self, img: np.ndarray) -> list[dict]:
+        """The first request's messages: the frame and the instruction."""
+        image = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                             "data": base64.standard_b64encode(_png(img)).decode()}}
+        return [{"role": "user", "content": [image, {"type": "text", "text": "Read this screen."}]}]
+
+    def ask(self, messages: list[dict]) -> Reply:
+        """One structured-output request; server-side fallback answers if the model declines."""
+        r = self.client.beta.messages.parse(
+            model=self.model, max_tokens=16000, system=SYSTEM, messages=messages,
+            output_format=ScreenReading, output_config={"effort": CLAUDE_EFFORT},
+            betas=["server-side-fallback-2026-07-01"], fallbacks="default",
+        )
+        if r.stop_reason == "refusal" or r.parsed_output is None:
+            return Reply(None, None, f"Claude returned no reading (stop reason: {r.stop_reason})")
+        # sent back as returned, minus the SDK's parsed copy of the JSON (append-only history)
+        turn = {"role": "assistant",
+                "content": [b.model_dump(exclude={"parsed_output"}, exclude_none=True) for b in r.content]}
+        return Reply(r.parsed_output, turn)
+
+    @contextmanager
+    def errors(self) -> Iterator[None]:
+        """Turn API setup failures into ValueErrors that say what to do."""
+        import anthropic
+        try:
+            yield
+        except anthropic.AuthenticationError as e:
+            raise ValueError(f"the Claude API rejected the credentials: {e.message}") from e
+        except anthropic.APIConnectionError as e:
+            raise ValueError("can't reach the Claude API; check the network connection") from e
+        except TypeError as e:
+            if "authentication method" not in str(e):
+                raise
+            raise ValueError("no Claude API credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from e
+
+
+class Ollama:
+    """An open-weight model run locally by Ollama: free, and the frames never leave your machine."""
+
+    workers = 1  # Ollama answers one request at a time unless OLLAMA_NUM_PARALLEL is raised
+
+    def __init__(self, model: str = OLLAMA_MODEL, client: Any = None):
+        import ollama
+        self.model = model
+        self.client: Any = client if client is not None else ollama.Client()  # OLLAMA_HOST picks another server
+
+    def start(self, img: np.ndarray) -> list[dict]:
+        """The first request's messages: the instruction, then the frame."""
+        return [{"role": "system", "content": SYSTEM},
+                {"role": "user", "content": "Read this screen.", "images": [_png(img)]}]
+
+    def ask(self, messages: list[dict]) -> Reply:
+        """One request, constrained to the reading's JSON schema."""
+        r = self.client.chat(model=self.model, messages=messages, format=ScreenReading.model_json_schema(),
+                             options={"temperature": 0})
+        text = r.message.content or ""
+        try:
+            reading = ScreenReading.model_validate_json(text)
+        except ValidationError as e:
+            return Reply(None, None, f"{self.model} returned a reading that doesn't fit the schema "
+                                     f"({e.error_count()} errors)")
+        return Reply(reading, {"role": "assistant", "content": text})
+
+    @contextmanager
+    def errors(self) -> Iterator[None]:
+        """Turn setup failures (Ollama not running, model not downloaded) into ValueErrors that say what to do."""
+        import ollama
+        try:
+            yield
+        except ConnectionError as e:
+            raise ValueError("can't reach Ollama: install it from https://ollama.com and start it "
+                             "(open the app, or run `ollama serve`)") from e
+        except ollama.ResponseError as e:
+            if e.status_code == 404:
+                raise ValueError(f"the model {self.model} isn't downloaded: run `ollama pull {self.model}`") from e
+            raise ValueError(f"Ollama error: {e.error}") from e
+
+
+def read_reading(img: np.ndarray, model: Claude | Ollama, guard: Guard, matcher: SpeciesMatcher,
                  reasks: int = REASKS) -> tuple[ScreenReading | None, list[str]]:
-    """Ask Claude to read one frame, check it, and retry with the failures; returns (reading, notes)."""
-    messages: list[dict] = [{"role": "user",
-                             "content": [_image_block(img), {"type": "text", "text": "Read this screen."}]}]
+    """Ask the model to read one frame, check it, and retry with the failures; returns (reading, notes)."""
+    messages = model.start(img)
     for attempt in range(reasks + 1):
-        response = _ask(client, messages)
-        if response.stop_reason == "refusal" or response.parsed_output is None:
-            return None, [f"Claude returned no reading (stop reason: {response.stop_reason})"]
-        reading = response.parsed_output
+        reply = model.ask(messages)
+        reading = reply.reading
+        if reading is None:
+            return None, [reply.problem or "no reading"]
         failures = check(reading, guard, matcher)
-        if not failures or attempt == reasks:
-            break
-        # append-only: the assistant turn goes back as returned (minus the SDK's parsed copy of the JSON),
-        # then the failures as a new user turn
+        if not failures or attempt == reasks or reply.turn is None:
+            return drop_failures(reading, failures)
         messages += [
-            {"role": "assistant",
-             "content": [b.model_dump(exclude={"parsed_output"}, exclude_none=True) for b in response.content]},
+            reply.turn,
             {"role": "user", "content": "These values failed validation:\n"
              + "\n".join(f"- {p}: {r}" for p, r in failures)
              + "\nLook at the screen again and return the full corrected reading. Use null for anything you "
                "can't read."},
         ]
-    return drop_failures(reading, failures)
+    raise AssertionError("unreachable: the last attempt always returns")
 
 
 def to_screen_result(reading: ScreenReading, matcher: SpeciesMatcher, species: dict) -> ScreenResult:
@@ -259,35 +340,22 @@ def to_screen_result(reading: ScreenReading, matcher: SpeciesMatcher, species: d
 
 
 def read_screens(frames: list[tuple[str, np.ndarray]], matcher: SpeciesMatcher, species: dict,
-                 client: Any = None, progress: Callable | None = None) -> list[ScreenResult]:
-    """Read every frame with Claude, in parallel, keeping frame order.
+                 model: Claude | Ollama, progress: Callable | None = None) -> list[ScreenResult]:
+    """Read every frame with the model, in parallel where it allows, keeping frame order.
 
-    Raises ValueError, with what to do, when the API can't be used (no credentials, rejected key, no network).
+    Raises ValueError, with what to do, when the model can't be used (no credentials, Ollama not running...).
     """
-    import anthropic
-    if client is None:
-        client = anthropic.Anthropic()
-
     def one(img: np.ndarray) -> ScreenResult:
         # a guard per frame, so threads don't share one
-        reading, notes = read_reading(img, client, build_guard(), matcher)
+        reading, notes = read_reading(img, model, build_guard(), matcher)
         res = to_screen_result(reading, matcher, species) if reading else ScreenResult("unknown")
         res.notes.extend(notes)
         return res
 
     results = []
-    try:
-        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            for i, ((label, _), res) in enumerate(zip(frames, pool.map(one, [img for _, img in frames]))):
-                results.append(res)
-                if progress:
-                    progress(i + 1, len(frames), label, res.kind)
-    except anthropic.AuthenticationError as e:
-        raise ValueError(f"the Claude API rejected the credentials: {e.message}") from e
-    except anthropic.APIConnectionError as e:
-        raise ValueError("can't reach the Claude API; check the network connection") from e
-    except TypeError as e:
-        if "authentication method" not in str(e):
-            raise
-        raise ValueError("no Claude API credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from e
+    with model.errors(), ThreadPoolExecutor(max_workers=model.workers) as pool:
+        for i, ((label, _), res) in enumerate(zip(frames, pool.map(one, [img for _, img in frames]))):
+            results.append(res)
+            if progress:
+                progress(i + 1, len(frames), label, res.kind)
     return results

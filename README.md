@@ -149,35 +149,45 @@ What each screen provides:
   a real Pokédex recording. Next iteration: apply the Evolve button's silhouette test to a
   Pokédex scroll to get never-caught for every species at once (see the roadmap).
 
-### Reading screens with Claude (optional, `pogo_evo_planner/scan/llm.py`)
+### Reading screens with an LLM (optional, `pogo_evo_planner/scan/llm.py`)
 
-`--ocr claude` replaces OCR with Claude (`claude-opus-5-5`), which reads each frame as an image
-and returns a structured reading: screen kind, Rare Candy, species, candy, the Evolve button's
-sprite, storage cells, Pokédex entries. It can identify a nicknamed Pokémon from its sprite,
-which OCR can't. Everything after that (merging frames, planning) is unchanged.
+Instead of OCR, a vision LLM can read each frame as an image and return a structured reading:
+screen kind, Rare Candy, species, candy, the Evolve button's sprite, storage cells, Pokédex
+entries. It can identify a nicknamed Pokémon from its sprite, which OCR can't. Everything after
+that (merging frames, planning) is unchanged. Two models are supported:
+
+| | `--ocr ollama` | `--ocr claude` |
+|---|---|---|
+| Model | runs on your machine with [Ollama](https://ollama.com); default `qwen3-vl:4b` | Claude (`claude-opus-5-5`) through the Anthropic API |
+| Cost | free | paid per frame (rough, unmeasured estimate: a few cents each) |
+| Privacy | nothing leaves your machine | screenshots go to Anthropic |
+| Speed / accuracy | slow on a laptop; small models read less accurately | faster and more capable |
 
 ```bash
-pip install -e '.[llm]'              # Anthropic SDK + Guardrails AI
+pip install -e '.[llm]'              # Anthropic SDK, Ollama client, Guardrails AI
+
+# free, local: install Ollama from https://ollama.com and start it, then
+ollama pull qwen3-vl:4b              # 3.3 GB; fits an 8 GB Mac (qwen3-vl:2b is 1.9 GB)
+pogo-evo-planner scan bag.png detail.png --ocr ollama --species data/latest.json
+
+# paid, Claude
 export ANTHROPIC_API_KEY=...          # or: ant auth login
-pogo-evo-planner scan bag.png detail1.png detail2.png --ocr claude --species data/latest.json
+pogo-evo-planner scan bag.png detail.png --ocr claude --species data/latest.json
 ```
+
+`--llm-model` picks another model for either backend.
 
 Every reading is checked with [Guardrails AI](https://github.com/guardrails-ai/guardrails)
 before it's used: names must match a species in the game data (after the same fuzzy matching
 OCR text gets), CP must be 10–10,000, counts must be in range, Pokédex numbers must exist, and a
-bag screen must have a Rare Candy count. If anything fails, Claude is asked once more with the
-list of failures. Values that still fail are dropped and reported as scan warnings.
+bag screen must have a Rare Candy count. If anything fails, the model is asked once more with the
+list of failures. Values that still fail are dropped and reported as scan warnings. Guardrails'
+own usage telemetry, which is on by default, is switched off, so validation runs locally and
+sends nothing (a test checks this).
 
-Before you use it:
-
-- **Your screenshots go to Anthropic's API.** OCR runs entirely on your machine; this doesn't.
-  Guardrails' own usage telemetry, which is on by default, is switched off, so validation runs
-  locally and sends nothing (a test checks this).
-- **It costs money per frame.** A rough, unmeasured estimate is a few cents per frame.
-  A screen recording yields hundreds of frames, so scans of more than 60 frames are refused
-  unless you raise `--llm-max-frames`. Screenshots, or a recording with a low `--fps`, are
-  the cheaper input.
-- It hasn't been run against real captures yet; the tests use a fake client.
+Because Claude is paid, a Claude scan of more than 60 frames is refused unless you raise
+`--llm-max-frames`; a screen recording yields hundreds of frames. Neither backend has been run
+against real captures yet; the tests use fake clients.
 
 ### Planning (`pogo_evo_planner/planner.py`)
 

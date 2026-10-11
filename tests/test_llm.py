@@ -1,4 +1,4 @@
-"""The Claude scanning backend, with a fake client: no network, no API key, no cost."""
+"""The LLM scanning backends (Claude, Ollama) with fake clients: no network, no API key, no cost."""
 import socket
 import tempfile
 import unittest
@@ -42,6 +42,17 @@ class FakeClient:
         return SimpleNamespace(stop_reason=self.stop_reason, parsed_output=r, content=[block])
 
 
+class FakeOllama:
+    """Stands in for ollama.Client(): returns queued JSON replies and records each request."""
+
+    def __init__(self, *replies):
+        self.queue, self.calls = list(replies), []
+
+    def chat(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(message=SimpleNamespace(content=self.queue.pop(0)))
+
+
 IMG = np.zeros((40, 20, 3), np.uint8)
 
 
@@ -51,7 +62,8 @@ class ClaudeScanTests(unittest.TestCase):
         self.m = SpeciesMatcher(SPECIES)
 
     def read(self, client):
-        found, notes = llm.read_reading(IMG, client, llm.build_guard(), self.m)
+        model = client if isinstance(client, llm.Ollama) else llm.Claude(client=client)
+        found, notes = llm.read_reading(IMG, model, llm.build_guard(), self.m)
         return (llm.to_screen_result(found, self.m, SPECIES) if found else None), notes
 
     def test_request_shape(self):
@@ -117,7 +129,7 @@ class ClaudeScanTests(unittest.TestCase):
             raise TypeError('"Could not resolve authentication method. Expected one of api_key ..."')
         client = SimpleNamespace(beta=SimpleNamespace(messages=SimpleNamespace(parse=no_auth)))
         with self.assertRaisesRegex(ValueError, "ANTHROPIC_API_KEY"):
-            llm.read_screens([("a", IMG)], self.m, SPECIES, client=client)
+            llm.read_screens([("a", IMG)], self.m, SPECIES, llm.Claude(client=client))
 
     def test_validation_makes_no_network_calls(self):
         # Guardrails sends usage telemetry by default; the backend must switch it off
@@ -137,16 +149,48 @@ class ClaudeScanTests(unittest.TestCase):
                 cv2.imwrite(p, IMG)
             with self.assertRaisesRegex(ValueError, "paid Claude request"):
                 scan(paths, SPECIES, backend="claude", max_llm_frames=1)
-        client = FakeClient(reading(kind="bag", rare_candy=7), reading(kind="storage", specimens=[]))
-        llm.WORKERS, workers = 1, llm.WORKERS  # one worker so the fake client's queue order is the frame order
-        try:
-            seen = []
-            results = llm.read_screens([("a", IMG), ("b", IMG)], self.m, SPECIES, client=client,
-                                       progress=lambda i, n, label, kind: seen.append((label, kind)))
-        finally:
-            llm.WORKERS = workers
+        model = llm.Claude(client=FakeClient(reading(kind="bag", rare_candy=7), reading(kind="storage", specimens=[])))
+        model.workers = 1  # so the fake client's queue order is the frame order
+        seen = []
+        results = llm.read_screens([("a", IMG), ("b", IMG)], self.m, SPECIES, model,
+                                   progress=lambda i, n, label, kind: seen.append((label, kind)))
         self.assertEqual([r.kind for r in results], ["bag", "storage"])
         self.assertEqual(seen, [("a", "bag"), ("b", "storage")])
+
+    def test_ollama_request_and_reading(self):
+        fake = FakeOllama(reading(kind="bag", rare_candy=42).model_dump_json())
+        res, notes = self.read(llm.Ollama(client=fake))
+        self.assertEqual((res.rare_candy, notes), (42, []))
+        call = fake.calls[0]
+        self.assertEqual(call["model"], "qwen3-vl:4b")
+        self.assertEqual(call["format"], llm.ScreenReading.model_json_schema())
+        self.assertEqual([m["role"] for m in call["messages"]], ["system", "user"])
+        self.assertEqual(call["messages"][1]["images"][0][:4], b"\x89PNG")
+
+    def test_ollama_retry_and_unusable_reply(self):
+        bad = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 99999}]).model_dump_json()
+        good = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 999}]).model_dump_json()
+        fake = FakeOllama(bad, good)
+        res, _ = self.read(llm.Ollama(client=fake))
+        self.assertEqual(res.specimens, [("DRATINI", 999)])
+        self.assertEqual(fake.calls[1]["messages"][2], {"role": "assistant", "content": bad})
+        res, notes = self.read(llm.Ollama(client=FakeOllama("not json")))
+        self.assertIsNone(res)
+        self.assertIn("doesn't fit the schema", notes[0])
+
+    def test_ollama_setup_errors_are_clear(self):
+        import ollama
+
+        def down(**_):
+            raise ConnectionError("Failed to connect to Ollama")
+
+        def missing(**_):
+            raise ollama.ResponseError("model not found", 404)
+
+        for chat, message in ((down, "ollama serve"), (missing, "ollama pull qwen3-vl:4b")):
+            model = llm.Ollama(client=SimpleNamespace(chat=chat))
+            with self.assertRaisesRegex(ValueError, message):
+                llm.read_screens([("a", IMG)], self.m, SPECIES, model)
 
 
 if __name__ == "__main__":
