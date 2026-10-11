@@ -1,5 +1,6 @@
 # pogo-evo-planner
 
+[![tests](https://github.com/kaustubhagarwal18/pogo-evo-planner/actions/workflows/tests.yml/badge.svg)](https://github.com/kaustubhagarwal18/pogo-evo-planner/actions/workflows/tests.yml)
 [![ci](https://github.com/kaustubhagarwal18/pogo-evo-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/kaustubhagarwal18/pogo-evo-planner/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -383,11 +384,12 @@ make test-fast   # skips the OCR end-to-end test
 make lint        # ruff, pylint, mypy, bandit, codespell, and gitleaks if installed
 ```
 
-Linter settings live in `pyproject.toml`. CI (`.github/workflows/ci.yml`) runs four jobs:
+Linter settings live in `pyproject.toml`. Two GitHub Actions workflows run on GitHub:
 
-- `lint`: ruff, pylint, mypy, bandit (security) and codespell.
-- `secrets`: gitleaks over the full git history.
-- `test`: the suite with the Tesseract backend on Python 3.10, 3.12 and 3.13.
-- `test-rapidocr`: the suite with RapidOCR (non-blocking).
+- **tests** (`.github/workflows/tests.yml`): everything in `tests/` with pytest, on every push to
+  any branch (or by hand from the Actions tab). `test` uses the Tesseract backend on Python 3.10,
+  3.12, 3.13 and 3.14; `test-rapidocr` uses RapidOCR (non-blocking).
+- **ci** (`.github/workflows/ci.yml`), on pushes to `main` and on pull requests: `lint` (ruff,
+  pylint, mypy, bandit, codespell) and `secrets` (gitleaks over the full git history).
 
 Not affiliated with Niantic, Scopely, Nintendo or The Pokémon Company.
