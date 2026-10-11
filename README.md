@@ -192,7 +192,9 @@ To plan from your whole collection instead (including species you caught once bu
 pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
 ```
 
-Review `inventory.json` and add evolution items under `"items"`, then plan:
+Review `inventory.json`. Add any candy counts the scan missed under `"candy"`: a family without one
+gets no Rare Candy, because its count is unknown, not 0. Add evolution items under `"items"`. Then
+plan:
 
 ```bash
 pogo-evo-planner plan inventory.json
@@ -381,6 +383,8 @@ against real captures yet; the tests use fake clients.
 - Partial top-ups are never suggested: Rare Candy only pays off when it completes an
   evolution. The text report lists trade evolutions as "trade instead". Verified against
   brute force.
+- A family with no candy count gets no Rare Candy: its count is unknown, not 0. The text report
+  names those families.
 
 ### Dashboard (`pogo_evo_planner/dashboard.py`)
 
@@ -419,11 +423,12 @@ for what's next and [CHANGELOG.md](CHANGELOG.md) for what each version changed.
 - `make test-fast`: skips the OCR end-to-end test.
 - `make lint`: ruff, pylint, mypy, bandit, codespell, and gitleaks if installed.
 
-Linter settings live in `pyproject.toml`. Two GitHub Actions workflows run on GitHub:
+Linter settings and pinned linter versions live in `pyproject.toml`, so `make lint` runs what CI
+runs. Two GitHub Actions workflows run on GitHub:
 
 - **tests** (`.github/workflows/tests.yml`): everything in `tests/` with pytest, on every push to
-  any branch (or by hand from the Actions tab). `test` uses the Tesseract backend on Python 3.10,
-  3.12, 3.13 and 3.14; `test-rapidocr` uses RapidOCR (non-blocking).
+  any branch, on pull requests from forks, and by hand from the Actions tab. `test` uses the
+  Tesseract backend on Python 3.10 to 3.14; `test-rapidocr` uses RapidOCR (non-blocking).
 - **ci** (`.github/workflows/ci.yml`), on pushes to `main` and on pull requests: `lint` (ruff,
   pylint, mypy, bandit, codespell) and `secrets` (gitleaks over the full git history).
 

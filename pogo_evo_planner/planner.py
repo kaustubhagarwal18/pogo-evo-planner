@@ -93,6 +93,7 @@ class Plan:
     families: list[FamilyPlan]
     trade_instead: list[tuple[Specimen, Step]] = field(default_factory=list)
     unknown_species: list[str] = field(default_factory=list)
+    no_candy_count: list[str] = field(default_factory=list)   # families that needed Rare Candy but have no count
 
 
 @dataclass
@@ -101,7 +102,7 @@ class Settings:
     repeat_value: float = 0.0        # share of value kept by an evolution into a species you already own
     allow_trade_evolutions: bool = False  # spend candy on evolutions that are free via trade
     new_entries_only: bool = False   # only plan evolutions into species never caught (`evolvenew`)
-    rare_candy_blocked_families: frozenset = frozenset()
+    rare_candy_blocked_families: frozenset = frozenset()   # on top of every family with no candy count
 
 
 def _items_key(c: Counter) -> tuple:
@@ -307,12 +308,16 @@ def plan(species: dict, tiers: dict, inv: Inventory, settings: Settings | None =
     from_base = candy_from_base(species)
     have = owned_species(inv, species)
     family_data = {}
+    held_back = []
     for fam, specs in by_family.items():
         specs = keep_specimens(specs, species, have)
         km, cpc = cost_per_candy(fam, species, tiers)
         owned = inv.candy.get(fam, 0)
         opts = family_options(fam, specs, species, inv, cpc, settings, trade_out, from_base)
-        blocked = fam in settings.rare_candy_blocked_families
+        # a missing candy count is unknown, not 0: Rare Candy would be guessed to cover the whole cost
+        blocked = fam in settings.rare_candy_blocked_families or fam not in inv.candy
+        if blocked and any(c > owned for c, *_ in opts):
+            held_back.append(fam)
         # option -> rare candy needed
         opts = [(max(0, c - owned), c, ikey, v, paths) for c, ikey, v, paths in opts
                 if not (blocked and c > owned)]
@@ -353,4 +358,4 @@ def plan(species: dict, tiers: dict, inv: Inventory, settings: Settings | None =
         if k not in seen:
             seen.add(k)
             trades.append((spec, step))
-    return Plan(inv.rare_candy, r_used, total, families, trades, unknown)
+    return Plan(inv.rare_candy, r_used, total, families, trades, unknown, sorted(held_back))

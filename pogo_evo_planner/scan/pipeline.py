@@ -13,6 +13,7 @@ import numpy as np
 
 from ..inventory import inventory_from_dict
 from ..planner import families_missing_candy
+from . import LLM_READERS
 from .frames import extract_frames
 from .ocr import read_words
 from .screens import ScreenResult, SpeciesMatcher, parse
@@ -33,13 +34,15 @@ def load_images(paths: Sequence[str | Path], fps: float = 3.0) -> list[tuple[str
     """Expand a mix of image and video paths into (label, frame) pairs."""
     out = []
     for p in map(Path, paths):
+        if not p.is_file():
+            raise ValueError(f"can't read {p}: not found")
         if p.suffix.lower() in VIDEO_EXT:
             for i, frame in enumerate(extract_frames(p, fps=fps)):
                 out.append((f"{p.name}#{i}", frame))
         else:
             img = cv2.imread(str(p))
             if img is None:
-                raise ValueError(f"can't read {p}: not found, or not an image")
+                raise ValueError(f"can't read {p}: not an image")
             out.append((p.name, img))
     return out
 
@@ -157,7 +160,7 @@ def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps:
     matcher = SpeciesMatcher(species)
     report = ScanReport()
     frames = load_images(paths, fps=fps)
-    if backend in ("llm", "ollama", "claude"):
+    if backend in LLM_READERS:
         if backend == "claude" and len(frames) > max_llm_frames:
             raise ValueError(f"{len(frames)} frames would each be a paid Claude request (limit {max_llm_frames}); "
                              "lower --fps, pass fewer files, or raise --llm-max-frames")

@@ -1,18 +1,22 @@
 name: tests
 
-# Runs everything in tests/ on every push, on any branch, and on demand from the Actions tab.
+# Runs everything in tests/ on every push, on any branch, on pull requests from forks (their pushes
+# don't run here), and on demand from the Actions tab.
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
   test:
     name: test (Python ${{ matrix.python }})
+    # a pull request from a branch of this repository already ran on its push; only forks need this run
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false   # see every Python version's result, not just the first failure
       matrix:
-        python: ["3.10", "3.12", "3.13", "3.14"]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,6 +33,7 @@ jobs:
   test-rapidocr:
     # The recommended OCR backend. Non-blocking until it has been calibrated on real screens.
     name: test (RapidOCR)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
