@@ -110,6 +110,18 @@ input:focus-visible, .btn:focus-visible, summary:focus-visible, .chip button:foc
 .start { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px;
          display: flex; flex-direction: column; gap: 12px; }
 .start p { margin: 0; color: var(--ink-2); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.choice { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; font: inherit;
+          color: var(--ink); background: var(--halo); border: 1px solid var(--line); border-radius: 12px;
+          padding: 14px; cursor: pointer; }
+.choice:hover { border-color: var(--seq-2); }
+.choice:focus-visible, .choice:focus-within { outline: 2px solid var(--seq-2); outline-offset: 2px; }
+.choice svg { width: 26px; height: 26px; fill: none; stroke: var(--seq-1); stroke-width: 1.8; stroke-linecap: round;
+              stroke-linejoin: round; margin-bottom: 4px; }
+.choice b { font-family: var(--display); font-size: 15px; }
+.choice span { color: var(--ink-2); font-size: 13px; }
+.link { font: inherit; color: var(--seq-1); background: none; border: 0; padding: 0; text-decoration: underline;
+        cursor: pointer; }
 
 /* editor */
 .editor { display: flex; flex-direction: column; gap: 12px; }
@@ -147,6 +159,28 @@ details.card[open] > summary { margin-bottom: 8px; }
 .add input:first-child { flex: 1 1 160px; }
 .add input[type="number"] { width: 100px; }
 .empty { color: var(--ink-3); font-size: 13px; margin: 0; }
+
+/* reading screenshots */
+.scan { display: flex; flex-direction: column; gap: 10px; }
+.scan fieldset { border: 0; margin: 0; padding: 0; }
+.scan legend { font-weight: 500; margin-bottom: 4px; }
+.scan .opt:last-child { border-bottom: 0; }
+.scan input[type="radio"] { margin-top: 4px; accent-color: var(--seq-1); width: 16px; height: 16px; flex: none; }
+.shots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.shots:empty, .scan .hint:empty { display: none; }
+.shots li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+            padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.shots .nm { overflow-wrap: anywhere; }
+.shots .what { color: var(--ink-3); }
+.shots .done .what { color: var(--good); }
+.shots .failed .what { color: var(--bad-ink); }
+.shots button { font: inherit; color: var(--ink-3); background: transparent; border: 0; border-radius: 6px;
+                padding: 2px 8px; cursor: pointer; }
+.scanned .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.scanned p { margin: 6px 0 0; }
+.scanned .warnings { margin: 8px 0 0; padding-left: 18px; color: var(--warn-ink); }
+.scanned .x { font: inherit; font-size: 18px; line-height: 1; color: var(--ink-3); background: transparent; border: 0;
+              border-radius: 6px; padding: 2px 8px; cursor: pointer; }
 
 .needs { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
 .needs .help { color: inherit; opacity: 0.85; margin: 4px 0 8px; }

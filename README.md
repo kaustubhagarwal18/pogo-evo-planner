@@ -41,14 +41,28 @@ long-running scanner apps stay behind, and it keeps accounts safe from Terms of 
 ## In your browser
 
 **[Open the planner](https://kaustubhagarwal18.github.io/pogo-evo-planner/)** to plan without
-installing anything. You can open an `inventory.json` or `evolvenew.json` that the commands below
-saved, try the example, or type your inventory in. The plan and the dashboard update as you edit,
-and the page asks for any candy counts and evolution items the plan is missing.
+installing anything. It opens with an example inventory and its plan, so you can see how it works,
+and two ways to replace it with yours: **Upload screenshots** or **Upload inventory.json**. For
+screenshots, say what you captured and pick the files:
 
-The planner's Python runs inside the page ([Pyodide](https://pyodide.org)), so your inventory
-never leaves your browser. The browser keeps it between visits, and **Download** saves your edits
-as a file. The first visit downloads about 6 MB of Python from jsDelivr, which the browser then
-caches. The page doesn't read screenshots yet: make the inventory with `scan` or `evolvenew`.
+- **the game's `evolvenew` search** (quickest): the results as you scroll, plus the Pokédex
+  filtered to Seen and your item bag, as for the `evolvenew` command below;
+- **your whole collection**: your item bag, storage, Pokédex and one Pokémon's page per family,
+  as for `scan`.
+
+An `inventory.json` or `evolvenew.json` that the commands saved opens the same way, or you can
+start from an empty inventory and type yours in. The plan and the dashboard update as you edit, and the page
+asks for anything the plan is missing: candy counts, evolution items, and Rare Candy when no bag
+screenshot was read.
+
+Everything runs inside the page, so your screenshots and inventory never leave your browser. The
+planner and screen parser are this project's own Python ([Pyodide](https://pyodide.org)), and
+[tesseract.js](https://tesseract.projects.naptha.com) reads the text with the same Tesseract model
+the `--ocr tesseract` reader uses. On 11 real screenshots, the page gave exactly the inventory
+`scan` and `evolvenew` give. The browser keeps the inventory between visits, and **Download**
+saves it as a file. The first visit downloads about 6 MB of Python from jsDelivr, and reading
+screenshots the first time about 17 MB more; the browser caches both. Reading 11 screenshots then
+takes about 10 s. Recordings aren't read in the browser yet: use `scan` or `evolvenew` for those.
 
 To run it from a clone instead (after the quick start below), build it and serve it on
 http://localhost:8000:
@@ -424,7 +438,10 @@ like `inventory.json`.
 A static page with no server code. A web worker loads Pyodide and unpacks the planner package
 (`planner.zip`) into it. The page sends the inventory as JSON to `webapp.WebPlanner`, which
 plans it with the same `planner.plan`, `cli.render` and dashboard as the commands do. The
-dashboard is shown in a sandboxed frame. `scripts/build_web.py` assembles the site: the page, the
+dashboard is shown in a sandboxed frame. Screenshots go through `webapp.WebScan`: Python makes the
+same three Tesseract passes as `--ocr tesseract`, tesseract.js reads them in the page, and
+`scan.pipeline.scan` parses and merges the screens as the command does, with `apply_evolvenew` on
+top for the `evolvenew` way. `scripts/build_web.py` assembles the site: the page, the
 package, the species table (normalized from the game master) and the example inventory. It stamps
 a build id into the page so browsers fetch changed files rather than cached ones. The **pages**
 workflow builds it with the latest game master and publishes it on GitHub Pages.

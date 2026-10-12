@@ -149,12 +149,18 @@ Next from that recording:
       the dashboard as it changes. The planner's Python runs in the page through Pyodide, so
       nothing leaves the device. It asks for missing candy and item counts, and it is published
       on GitHub Pages with the latest game master
-- [ ] Web UI: read screenshots in the page. OCR through onnxruntime-web (RapidOCR's own models)
-      or tesseract.js, returning the same `Word` boxes as `ocr.read_words`, so `screens.py` runs
-      unchanged; check it against `tests/real/` before trusting it on phones
+- [x] Web UI: read screenshots in the page, the `evolvenew` way or the whole collection.
+      tesseract.js reads the command line's own three passes with the same model, and the
+      scanner's Python parses them unchanged. It gave exactly the CLI's inventory on 11 real
+      screenshots
+- [ ] Web UI: RapidOCR (onnxruntime-web with its own models) as a second reader, for the screens
+      Tesseract reads worse; needs its detection post-processing ported
+- [ ] Web UI: add screenshots to an open scan (a Pokémon page for a missing candy count) instead
+      of reading every screenshot again
 - [ ] Web UI: read recordings, with frames from a `<video>` drawn to a canvas at 3 fps in place
       of `frames.py`; check whether Pyodide's OpenCV can run the sharpness and Evolve-button checks
-- [ ] Web UI: the `evolvenew` flow in the page (its questions are already injected I/O)
+- [ ] Web UI: the `evolvenew` plain-words report (missing species, evolve now, Rare Candy, not
+      yet) next to the dashboard
 - [ ] Installable on phones: a web app manifest and an offline cache for Pyodide and the site
 - [ ] Android app: MediaProjection capture while the player browses, ML Kit OCR on device,
       planner ported or run via Chaquopy. Passive reading only; never automate input.

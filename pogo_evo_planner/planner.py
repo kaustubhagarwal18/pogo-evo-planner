@@ -33,6 +33,7 @@ Optimisation
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .gamemaster import evolution_items
@@ -186,6 +187,18 @@ def owned_species(inv: Inventory, species: dict) -> set[str]:
     return with_earlier_stages(with_forms({s.species for s in inv.pokemon} - inv.not_caught, species), species)
 
 
+def gives_new_species(inv: Inventory, species: dict, settings: Settings) -> Callable[[str], bool]:
+    """A test for whether evolving into a species gives the player one they don't have, which is what earns an
+    evolution its full value: a species not owned, or with new_entries_only (evolvenew) one the Pokédex hasn't
+    registered. There the game's own list of never-caught species decides, even where owning a later stage would
+    suggest an earlier one was caught (Victreebel can be caught without ever having a Weepinbell)."""
+    owned = owned_species(inv, species)
+    if not settings.new_entries_only:
+        return lambda sp: sp not in owned
+    registered = (inv.pokedex | owned) - inv.not_caught
+    return lambda sp: sp not in registered
+
+
 def families_missing_candy(inv: Inventory, species: dict) -> list[str]:
     """Families with no candy count where it matters: an owned member can still evolve into something new."""
     owned = owned_species(inv, species)
@@ -246,8 +259,8 @@ def family_options(family: str, specimens: list[Specimen], species: dict, inv: I
     from_base = from_base if from_base is not None else candy_from_base(species)
     own_candy = inv.candy.get(family, 0)
     max_candy = own_candy + inv.rare_candy
-    owned = owned_species(inv, species)
-    registered = (inv.pokedex | owned) - inv.not_caught
+    registered = (inv.pokedex | owned_species(inv, species)) - inv.not_caught
+    is_new = gives_new_species(inv, species, settings)
 
     def entry(sp: str):
         """What counts as one new species: with new_entries_only, a Pokédex entry, so the forms of one
@@ -274,11 +287,7 @@ def family_options(family: str, specimens: list[Specimen], species: dict, inv: I
                 # a repeat (a species you already have) may only use your own candy, never Rare Candy
                 if rep + p.candy <= own_candy:
                     moves.append((base + p.candy * cpc * settings.repeat_value, rep + p.candy, firsts))
-                # new_entries_only (evolvenew): the game's own list of never-caught species decides, even
-                # where owning a later stage would suggest an earlier one was caught (Victreebel can be
-                # caught without ever having a Weepinbell)
-                unowned = final not in registered if settings.new_entries_only else final not in owned
-                if final and unowned and entry(final) not in firsts:
+                if final and is_new(final) and entry(final) not in firsts:
                     # a new species is worth the same however it is reached, so the cheapest route wins
                     moves.append((base + from_base.get(final, p.candy) * cpc, rep, firsts | {entry(final)}))
                 for v, r, f in moves:
