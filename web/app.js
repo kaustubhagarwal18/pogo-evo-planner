@@ -217,6 +217,24 @@ async function openExample() {
   }
 }
 
+/** Forget everything kept in this browser and start again as on a first visit: the example, default settings, no
+    screenshots chosen and no capture kind picked. */
+function reset() {
+  try {
+    localStorage.removeItem(STORE);
+  } catch (error) {
+    // storage is off: nothing was kept, so there's nothing to remove
+  }
+  Object.assign(state, { inv: null, source: "", example: false, options: { ...DEFAULTS }, scan: null,
+                         rareUnknown: false, mode: "" });
+  shots = [];
+  byId("scan").hidden = true;
+  byId("find").value = "";
+  document.querySelectorAll('input[name="mode"]').forEach((radio) => { radio.checked = false; });
+  renderShots();
+  openExample();
+}
+
 /** Whether the open inventory may be replaced by what: yes when there's none or it's the example, else ask. */
 function replaceOk(what) {
   return !state.inv || state.example
@@ -898,9 +916,11 @@ byId("download").addEventListener("click", () => {
   const name = /\.json$/i.test(state.source) ? state.source : "inventory.json";
   download(name, JSON.stringify(state.inv, null, 2) + "\n", "application/json");
 });
-byId("close").addEventListener("click", () => {
-  if (window.confirm("Close this inventory and go back to the example? It's removed from this browser, so download "
-                     + "it first to keep it.")) openExample();
+byId("reset").addEventListener("click", () => {
+  if (reading) return;   // a scan is writing into the state; reset once it's done
+  if (!window.confirm("Reset the page? Your inventory, its edits and your settings are removed from this browser, "
+                      + "and the example opens again. Download your inventory first to keep it.")) return;
+  reset();
 });
 byId("dl-dash").addEventListener("click", () => download("dashboard.html", reply.dashboard, "text/html"));
 byId("copy").addEventListener("click", () => {

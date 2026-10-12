@@ -59,8 +59,8 @@ Everything runs inside the page, so your screenshots and inventory never leave y
 planner and screen parser are this project's own Python ([Pyodide](https://pyodide.org)), and
 [tesseract.js](https://tesseract.projects.naptha.com) reads the text with the same Tesseract model
 the `--ocr tesseract` reader uses. On 11 real screenshots, the page gave exactly the inventory
-`scan` and `evolvenew` give. The browser keeps the inventory between visits, and **Download**
-saves it as a file. The first visit downloads about 6 MB of Python from jsDelivr, and reading
+`scan` and `evolvenew` give. The browser keeps the inventory between visits, **Download** saves it
+as a file, and **Reset** removes everything the page saved and starts again from the example. The first visit downloads about 6 MB of Python from jsDelivr, and reading
 screenshots the first time about 17 MB more; the browser caches both. Reading 11 screenshots then
 takes about 10 s. Recordings aren't read in the browser yet: use `scan` or `evolvenew` for those.
 
