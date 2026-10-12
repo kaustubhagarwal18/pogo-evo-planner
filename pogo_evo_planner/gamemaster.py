@@ -12,6 +12,7 @@ Two input formats are supported:
                 "evolutions": [{"to": "DRAGONAIR", "candy": 25, "item": null,
                                 "trade_free": false, "notes": []}]}}
 """
+
 from __future__ import annotations
 
 import json
@@ -68,7 +69,12 @@ def _key(name: str) -> str:
 
 def evolution_items(species: dict) -> set[str]:
     """Every item some evolution in the species table needs."""
-    return {e["item"] for s in species.values() for e in s.get("evolutions", []) if e.get("item")}
+    return {
+        evolution["item"]
+        for entry in species.values()
+        for evolution in entry.get("evolutions", [])
+        if evolution.get("item")
+    }
 
 
 def item_id(name: str, known: set[str]) -> str | None:
@@ -81,12 +87,12 @@ def item_id(name: str, known: set[str]) -> str | None:
     return None
 
 
-def _species_key(ps: dict) -> str:
+def _species_key(settings: dict) -> str:
     """Species id for a game master entry: the form name for regional/alternate forms, else the Pokémon id."""
-    form = ps.get("form")
+    form = settings.get("form")
     if form and not str(form).endswith("_NORMAL"):
         return str(form)
-    return str(ps["pokemonId"])
+    return str(settings["pokemonId"])
 
 
 def _target_key(branch: dict) -> str:
@@ -101,35 +107,37 @@ def parse_game_master(entries: list) -> dict:
     """Normalize the raw PokeMiners game master into a species table."""
     species: dict[str, dict] = {}
     for entry in entries:
-        tid = entry.get("templateId", "")
-        ps = entry.get("data", {}).get("pokemonSettings")
-        if not ps or not _POKEMON_TEMPLATE.match(tid):
+        template_id = entry.get("templateId", "")
+        settings = entry.get("data", {}).get("pokemonSettings")
+        if not settings or not _POKEMON_TEMPLATE.match(template_id):
             continue
-        key = _species_key(ps)
+        key = _species_key(settings)
         if key in species:  # first entry wins (base form appears first)
             continue
-        family = str(ps.get("familyId", ps["pokemonId"])).removeprefix("FAMILY_")
+        family = str(settings.get("familyId", settings["pokemonId"])).removeprefix("FAMILY_")
         evolutions = []
-        for br in ps.get("evolutionBranch", []) or []:
-            if "evolution" not in br or "temporaryEvolution" in br:
+        for branch in settings.get("evolutionBranch", []) or []:
+            if "evolution" not in branch or "temporaryEvolution" in branch:
                 continue  # mega evolutions use energy, not candy
             notes = []
-            for k, tmpl in _CONDITION_NOTES.items():
-                if br.get(k):
-                    notes.append(tmpl.format(v=br[k]))
-            item = br.get("evolutionItemRequirement") or br.get("lureItemRequirement")
-            evolutions.append({
-                "to": _target_key(br),
-                "candy": int(br.get("candyCost", ps.get("candyToEvolve", 0)) or 0),
-                "item": item,
-                "trade_free": bool(br.get("noCandyCostViaTrade", False)),
-                "notes": notes,
-            })
+            for condition, template in _CONDITION_NOTES.items():
+                if branch.get(condition):
+                    notes.append(template.format(v=branch[condition]))
+            item = branch.get("evolutionItemRequirement") or branch.get("lureItemRequirement")
+            evolutions.append(
+                {
+                    "to": _target_key(branch),
+                    "candy": int(branch.get("candyCost", settings.get("candyToEvolve", 0)) or 0),
+                    "item": item,
+                    "trade_free": bool(branch.get("noCandyCostViaTrade", False)),
+                    "notes": notes,
+                }
+            )
         species[key] = {
-            "dex": int(tid[1:5]),
+            "dex": int(template_id[1:5]),
             "family": family,
-            "buddy_km": float(ps.get("kmBuddyDistance", 1) or 1),
-            "rarity": _RARITY_MAP.get(ps.get("rarity", ""), "standard"),
+            "buddy_km": float(settings.get("kmBuddyDistance", 1) or 1),
+            "rarity": _RARITY_MAP.get(settings.get("rarity", ""), "standard"),
             "evolutions": evolutions,
         }
     return species

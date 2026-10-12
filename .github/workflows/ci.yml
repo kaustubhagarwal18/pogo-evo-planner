@@ -17,6 +17,8 @@ jobs:
         run: pip install -e '.[ocr,llm,dev]'   # all extras, so mypy and pylint see every import
       - name: Ruff
         run: ruff check pogo_evo_planner tests scripts
+      - name: Ruff format
+        run: ruff format --check pogo_evo_planner tests scripts   # fix with: make format
       - name: Pylint
         run: |
           pylint pogo_evo_planner scripts

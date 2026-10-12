@@ -16,6 +16,7 @@ the list of failures. Guardrails' own usage telemetry is switched off: validatio
 
 Needs the `llm` extras: `pip install -e '.[llm]'`.
 """
+
 from __future__ import annotations
 
 import base64
@@ -36,9 +37,9 @@ from pydantic import BaseModel, ValidationError
 from .screens import ScreenResult, SpeciesMatcher
 
 CLAUDE_MODEL = "claude-opus-5-5"
-CLAUDE_EFFORT = "medium"   # reading a screen isn't hard reasoning; raise it if readings come back wrong
+CLAUDE_EFFORT = "medium"  # reading a screen isn't hard reasoning; raise it if readings come back wrong
 OLLAMA_MODEL = "qwen3-vl:4b"  # 3.3 GB download, fits an 8 GB Mac; qwen3-vl:2b is 1.9 GB, qwen3-vl:8b 6.1 GB
-REASKS = 1                 # retries when Guardrails rejects part of a reading
+REASKS = 1  # retries when Guardrails rejects part of a reading
 
 
 def _guardrails_offline() -> None:
@@ -53,25 +54,26 @@ os.environ.setdefault("GUARDRAILS_RUN_SYNC", "true")  # validate in this thread;
 
 # ---------- what Claude returns (the structured-output schema) ----------
 
+
 class Specimen(BaseModel):
-    name: str              # species name as printed in the cell
-    cp: int | None         # null when the CP is cut off or unreadable
+    name: str  # species name as printed in the cell
+    cp: int | None  # null when the CP is cut off or unreadable
 
 
 class DexEntry(BaseModel):
-    number: int            # national dex number shown under the sprite
-    caught: bool           # colour sprite = caught; dark silhouette = only seen
+    number: int  # national dex number shown under the sprite
+    caught: bool  # colour sprite = caught; dark silhouette = only seen
 
 
 class ScreenReading(BaseModel):
     kind: Literal["bag", "detail", "storage", "pokedex", "other"]
-    rare_candy: int | None                                  # bag: Rare Candy count (not Rare Candy XL)
-    species: str | None                                     # detail: the Pokémon's species
-    candy_name: str | None                                  # detail: the word before "CANDY", e.g. DRATINI
-    candy: int | None                                       # detail: that candy count (not Candy XL)
+    rare_candy: int | None  # bag: Rare Candy count (not Rare Candy XL)
+    species: str | None  # detail: the Pokémon's species
+    candy_name: str | None  # detail: the word before "CANDY", e.g. DRATINI
+    candy: int | None  # detail: that candy count (not Candy XL)
     evolve_sprite: Literal["colour", "silhouette", "none"]  # detail: sprite on the EVOLVE button
-    specimens: list[Specimen]                               # storage: one per grid cell
-    pokedex: list[DexEntry]                                 # pokedex: one per entry
+    specimens: list[Specimen]  # storage: one per grid cell
+    pokedex: list[DexEntry]  # pokedex: one per entry
 
 
 SYSTEM = """You read screenshots of the Pokémon GO mobile game and report what they show.
@@ -93,6 +95,7 @@ Leave fields that don't apply to the screen as null or empty lists, and evolve_s
 # ---------- checks (Guardrails validators) ----------
 # Validator's _inference_local/_inference_remote hooks are for model-based validators; these are plain rules.
 # pylint: disable=abstract-method
+
 
 @register_validator(name="pogo/known-species", data_type="string")
 class KnownSpecies(Validator):
@@ -169,8 +172,11 @@ def build_guard() -> Guard:
 def check(reading: ScreenReading, guard: Guard, matcher: SpeciesMatcher) -> list[tuple[str, str]]:
     """Run the Guardrails checks; return (JSON path, reason) for each failure."""
     outcome = guard.parse(reading.model_dump_json(), metadata={"matcher": matcher})
-    return [(s.property_path or "$", s.failure_reason or "failed")
-            for s in outcome.validation_summaries or [] if s.validator_status == "fail"]
+    return [
+        (summary.property_path or "$", summary.failure_reason or "failed")
+        for summary in outcome.validation_summaries or []
+        if summary.validator_status == "fail"
+    ]
 
 
 def drop_failures(reading: ScreenReading, failures: list[tuple[str, str]]) -> tuple[ScreenReading, list[str]]:
@@ -185,26 +191,27 @@ def drop_failures(reading: ScreenReading, failures: list[tuple[str, str]]) -> tu
         elif parts[0] in ("rare_candy", "species", "candy_name", "candy"):
             data[parts[0]] = None
         notes.append(f"Claude reading rejected at {path}: {reason}")
-    for key, idx in gone.items():
-        data[key] = [item for i, item in enumerate(data[key]) if i not in idx]
+    for key, indexes in gone.items():
+        data[key] = [item for index, item in enumerate(data[key]) if index not in indexes]
     return ScreenReading.model_validate(data), notes
 
 
 # ---------- the models ----------
 
-def _png(img: np.ndarray) -> bytes:
+
+def _png(image: np.ndarray) -> bytes:
     """A frame as PNG bytes (lossless, so small text stays sharp)."""
-    ok, png = cv2.imencode(".png", img)
-    if not ok:
+    encoded, png = cv2.imencode(".png", image)
+    if not encoded:
         raise ValueError("could not encode frame as PNG")
     return png.tobytes()
 
 
 @dataclass
 class Reply:
-    reading: ScreenReading | None   # None when the model gave no usable reading
-    turn: dict | None               # the model's message, sent back with the failures on a retry
-    problem: str | None = None      # why there's no reading
+    reading: ScreenReading | None  # None when the model gave no usable reading
+    turn: dict | None  # the model's message, sent back with the failures on a retry
+    problem: str | None = None  # why there's no reading
 
 
 class Claude:
@@ -215,43 +222,58 @@ class Claude:
     def __init__(self, model: str = CLAUDE_MODEL, client: Any = None):
         """Use the given client, or one built from the Anthropic credentials in the environment."""
         import anthropic
+
         self.model = model
         self.client: Any = client if client is not None else anthropic.Anthropic()  # Any: tests pass a fake
 
-    def start(self, img: np.ndarray) -> list[dict]:
+    def start(self, image: np.ndarray) -> list[dict]:
         """The first request's messages: the frame and the instruction."""
-        image = {"type": "image", "source": {"type": "base64", "media_type": "image/png",
-                                             "data": base64.standard_b64encode(_png(img)).decode()}}
-        return [{"role": "user", "content": [image, {"type": "text", "text": "Read this screen."}]}]
+        image_block = {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": base64.standard_b64encode(_png(image)).decode(),
+            },
+        }
+        return [{"role": "user", "content": [image_block, {"type": "text", "text": "Read this screen."}]}]
 
     def ask(self, messages: list[dict]) -> Reply:
         """One structured-output request; server-side fallback answers if the model declines."""
-        r = self.client.beta.messages.parse(
-            model=self.model, max_tokens=16000, system=SYSTEM, messages=messages,
-            output_format=ScreenReading, output_config={"effort": CLAUDE_EFFORT},
-            betas=["server-side-fallback-2026-07-01"], fallbacks="default",
+        response = self.client.beta.messages.parse(
+            model=self.model,
+            max_tokens=16000,
+            system=SYSTEM,
+            messages=messages,
+            output_format=ScreenReading,
+            output_config={"effort": CLAUDE_EFFORT},
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
         )
-        if r.stop_reason == "refusal" or r.parsed_output is None:
-            return Reply(None, None, f"Claude returned no reading (stop reason: {r.stop_reason})")
+        if response.stop_reason == "refusal" or response.parsed_output is None:
+            return Reply(None, None, f"Claude returned no reading (stop reason: {response.stop_reason})")
         # sent back as returned, minus the SDK's parsed copy of the JSON (append-only history)
-        turn = {"role": "assistant",
-                "content": [b.model_dump(exclude={"parsed_output"}, exclude_none=True) for b in r.content]}
-        return Reply(r.parsed_output, turn)
+        turn = {
+            "role": "assistant",
+            "content": [block.model_dump(exclude={"parsed_output"}, exclude_none=True) for block in response.content],
+        }
+        return Reply(response.parsed_output, turn)
 
     @contextmanager
     def errors(self) -> Iterator[None]:
         """Turn API setup failures into ValueErrors that say what to do."""
         import anthropic
+
         try:
             yield
-        except anthropic.AuthenticationError as e:
-            raise ValueError(f"the Claude API rejected the credentials: {e.message}") from e
-        except anthropic.APIConnectionError as e:
-            raise ValueError("can't reach the Claude API; check the network connection") from e
-        except TypeError as e:
-            if "authentication method" not in str(e):
+        except anthropic.AuthenticationError as error:
+            raise ValueError(f"the Claude API rejected the credentials: {error.message}") from error
+        except anthropic.APIConnectionError as error:
+            raise ValueError("can't reach the Claude API; check the network connection") from error
+        except TypeError as error:
+            if "authentication method" not in str(error):
                 raise
-            raise ValueError("no Claude API credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from e
+            raise ValueError("no Claude API credentials: set ANTHROPIC_API_KEY or run `ant auth login`") from error
 
 
 class Ollama:
@@ -262,39 +284,49 @@ class Ollama:
     def __init__(self, model: str = OLLAMA_MODEL, client: Any = None):
         """Use the given client, or one for the local Ollama server (OLLAMA_HOST picks another)."""
         import ollama
+
         self.model = model
         self.client: Any = client if client is not None else ollama.Client()  # OLLAMA_HOST picks another server
 
-    def start(self, img: np.ndarray) -> list[dict]:
+    def start(self, image: np.ndarray) -> list[dict]:
         """The first request's messages: the instruction, then the frame."""
-        return [{"role": "system", "content": SYSTEM},
-                {"role": "user", "content": "Read this screen.", "images": [_png(img)]}]
+        return [
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": "Read this screen.", "images": [_png(image)]},
+        ]
 
     def ask(self, messages: list[dict]) -> Reply:
         """One request, constrained to the reading's JSON schema."""
-        r = self.client.chat(model=self.model, messages=messages, format=ScreenReading.model_json_schema(),
-                             options={"temperature": 0})
-        text = r.message.content or ""
+        response = self.client.chat(
+            model=self.model, messages=messages, format=ScreenReading.model_json_schema(), options={"temperature": 0}
+        )
+        text = response.message.content or ""
         try:
             reading = ScreenReading.model_validate_json(text)
-        except ValidationError as e:
-            return Reply(None, None, f"{self.model} returned a reading that doesn't fit the schema "
-                                     f"({e.error_count()} errors)")
+        except ValidationError as error:
+            return Reply(
+                None,
+                None,
+                f"{self.model} returned a reading that doesn't fit the schema ({error.error_count()} errors)",
+            )
         return Reply(reading, {"role": "assistant", "content": text})
 
     @contextmanager
     def errors(self) -> Iterator[None]:
         """Turn setup failures (Ollama not running, model not downloaded) into ValueErrors that say what to do."""
         import ollama
+
         try:
             yield
-        except ConnectionError as e:
-            raise ValueError("can't reach Ollama: install it from https://ollama.com and start it "
-                             "(open the app, or run `ollama serve`)") from e
-        except ollama.ResponseError as e:
-            if e.status_code == 404:
-                raise ValueError(f"the model {self.model} isn't downloaded: run `ollama pull {self.model}`") from e
-            raise ValueError(f"Ollama error: {e.error}") from e
+        except ConnectionError as error:
+            raise ValueError(
+                "can't reach Ollama: install it from https://ollama.com and start it "
+                "(open the app, or run `ollama serve`)"
+            ) from error
+        except ollama.ResponseError as error:
+            if error.status_code == 404:
+                raise ValueError(f"the model {self.model} isn't downloaded: run `ollama pull {self.model}`") from error
+            raise ValueError(f"Ollama error: {error.error}") from error
 
 
 def make_model(backend: str, name: str | None = None) -> Claude | Ollama:
@@ -304,10 +336,11 @@ def make_model(backend: str, name: str | None = None) -> Claude | Ollama:
     return Ollama(name or OLLAMA_MODEL)
 
 
-def read_reading(img: np.ndarray, model: Claude | Ollama, guard: Guard, matcher: SpeciesMatcher,
-                 reasks: int = REASKS) -> tuple[ScreenReading | None, list[str]]:
+def read_reading(
+    image: np.ndarray, model: Claude | Ollama, guard: Guard, matcher: SpeciesMatcher, reasks: int = REASKS
+) -> tuple[ScreenReading | None, list[str]]:
     """Ask the model to read one frame, check it, and retry with the failures; returns (reading, notes)."""
-    messages = model.start(img)
+    messages = model.start(image)
     for attempt in range(reasks + 1):
         reply = model.ask(messages)
         reading = reply.reading
@@ -318,10 +351,13 @@ def read_reading(img: np.ndarray, model: Claude | Ollama, guard: Guard, matcher:
             return drop_failures(reading, failures)
         messages += [
             reply.turn,
-            {"role": "user", "content": "These values failed validation:\n"
-             + "\n".join(f"- {p}: {r}" for p, r in failures)
-             + "\nLook at the screen again and return the full corrected reading. Use null for anything you "
-               "can't read."},
+            {
+                "role": "user",
+                "content": "These values failed validation:\n"
+                + "\n".join(f"- {path}: {reason}" for path, reason in failures)
+                + "\nLook at the screen again and return the full corrected reading. Use null for anything you "
+                "can't read.",
+            },
         ]
     raise AssertionError("unreachable: the last attempt always returns")
 
@@ -330,50 +366,55 @@ def to_screen_result(reading: ScreenReading, matcher: SpeciesMatcher, species: d
     """Convert a checked reading into the ScreenResult the OCR parsers produce."""
     if reading.kind == "other":
         return ScreenResult("unknown")
-    r = ScreenResult(reading.kind)
+    result = ScreenResult(reading.kind)
     if reading.kind == "bag":
-        r.rare_candy = reading.rare_candy
+        result.rare_candy = reading.rare_candy
     elif reading.kind == "detail":
-        sp = matcher.match(reading.species) if reading.species else None
-        candy_sp = matcher.match(reading.candy_name) if reading.candy_name else sp
-        if candy_sp and reading.candy is not None:
-            r.candy[species[candy_sp]["family"]] = reading.candy
-        evos = species.get(sp, {}).get("evolutions", []) if sp else []
-        if len(evos) == 1 and reading.evolve_sprite != "none":   # branched lines show several buttons
-            (r.dex_caught if reading.evolve_sprite == "colour" else r.dex_not_caught).add(evos[0]["to"])
+        species_id = matcher.match(reading.species) if reading.species else None
+        candy_species = matcher.match(reading.candy_name) if reading.candy_name else species_id
+        if candy_species and reading.candy is not None:
+            result.candy[species[candy_species]["family"]] = reading.candy
+        evolutions = species.get(species_id, {}).get("evolutions", []) if species_id else []
+        if len(evolutions) == 1 and reading.evolve_sprite != "none":  # branched lines show several buttons
+            (result.dex_caught if reading.evolve_sprite == "colour" else result.dex_not_caught).add(evolutions[0]["to"])
     elif reading.kind == "storage":
-        for s in reading.specimens:
-            sp = matcher.match(s.name)
-            if sp:
-                r.specimens.append((sp, s.cp))
+        for specimen in reading.specimens:
+            species_id = matcher.match(specimen.name)
+            if species_id:
+                result.specimens.append((species_id, specimen.cp))
     elif reading.kind == "pokedex":
-        for e in reading.pokedex:
-            sp = matcher.by_dex.get(e.number)
-            if sp:
-                (r.dex_caught if e.caught else r.dex_seen_only).add(sp)
-    return r
+        for entry in reading.pokedex:
+            species_id = matcher.by_dex.get(entry.number)
+            if species_id:
+                (result.dex_caught if entry.caught else result.dex_seen_only).add(species_id)
+    return result
 
 
-def read_screens(frames: list[tuple[str, np.ndarray]], matcher: SpeciesMatcher, species: dict,
-                 model: Claude | Ollama | None = None, progress: Callable | None = None) -> list[ScreenResult]:
+def read_screens(
+    frames: list[tuple[str, np.ndarray]],
+    matcher: SpeciesMatcher,
+    species: dict,
+    model: Claude | Ollama | None = None,
+    progress: Callable | None = None,
+) -> list[ScreenResult]:
     """Read every frame with the model (default: the local Ollama one), in parallel where it allows, in order.
 
     Raises ValueError, with what to do, when the model can't be used (no credentials, Ollama not running...).
     """
     model = model or make_model("llm")
 
-    def one(img: np.ndarray) -> ScreenResult:
+    def one(image: np.ndarray) -> ScreenResult:
         """Read one frame with the model and turn the checked reading into a screen result."""
         # a guard per frame, so threads don't share one
-        reading, notes = read_reading(img, model, build_guard(), matcher)
-        res = to_screen_result(reading, matcher, species) if reading else ScreenResult("unknown")
-        res.notes.extend(notes)
-        return res
+        reading, notes = read_reading(image, model, build_guard(), matcher)
+        result = to_screen_result(reading, matcher, species) if reading else ScreenResult("unknown")
+        result.notes.extend(notes)
+        return result
 
     results = []
     with model.errors(), ThreadPoolExecutor(max_workers=model.workers) as pool:
-        for i, ((label, _), res) in enumerate(zip(frames, pool.map(one, [img for _, img in frames]))):
-            results.append(res)
+        for index, ((label, _), result) in enumerate(zip(frames, pool.map(one, [image for _, image in frames]))):
+            results.append(result)
             if progress:
-                progress(i + 1, len(frames), label, res.kind)
+                progress(index + 1, len(frames), label, result.kind)
     return results

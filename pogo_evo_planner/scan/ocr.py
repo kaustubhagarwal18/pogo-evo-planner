@@ -13,6 +13,7 @@ The browser app reads screens with tesseract.js instead: it reads the same passe
 RapidOCR returns whole text lines, while the screen parsers work on words, so
 lines are split into words with x positions estimated from character offsets.
 """
+
 from __future__ import annotations
 
 import csv
@@ -33,8 +34,8 @@ import numpy as np
 @dataclass(frozen=True)
 class Word:
     text: str
-    x: int   # left, in original image pixels
-    y: int   # top
+    x: int  # left, in original image pixels
+    y: int  # top
     w: int
     h: int
     conf: float
@@ -52,6 +53,7 @@ class Word:
 
 # ---------------- tesseract ----------------
 
+
 def tesseract_available() -> bool:
     """True when the tesseract binary is on PATH."""
     return shutil.which("tesseract") is not None
@@ -68,18 +70,26 @@ def words_from_tsv(tsv: str, scale: float = 1.0) -> list[Word]:
     words = []
     for row in csv.DictReader(io.StringIO(tsv), delimiter="\t", quoting=csv.QUOTE_NONE):
         text = (row.get("text") or "").strip()
-        conf = float(row.get("conf") or -1)
-        if not text or conf < 0:
+        confidence = float(row.get("conf") or -1)
+        if not text or confidence < 0:
             continue
-        words.append(Word(text, int(int(row["left"]) / scale), int(int(row["top"]) / scale),
-                          int(int(row["width"]) / scale), int(int(row["height"]) / scale), conf / 100))
+        words.append(
+            Word(
+                text,
+                int(int(row["left"]) / scale),
+                int(int(row["top"]) / scale),
+                int(int(row["width"]) / scale),
+                int(int(row["height"]) / scale),
+                confidence / 100,
+            )
+        )
     return words
 
 
-def tesseract_passes(img: np.ndarray) -> list[tuple[np.ndarray, float]]:
+def tesseract_passes(image: np.ndarray) -> list[tuple[np.ndarray, float]]:
     """The images Tesseract reads for one screen, each with the scale it was resized by. Sparse-text mode silently
     drops lines now and then, and which ones it drops depends on scale and polarity, so it reads three."""
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # phone screenshots are ~1080 px wide; an upscaled pass helps small UI text
     scale = max(1.0, 1600 / gray.shape[1])
     big = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
@@ -90,35 +100,49 @@ def tesseract_passes(img: np.ndarray) -> list[tuple[np.ndarray, float]]:
 def merge_passes(passes: list[list[Word]]) -> list[Word]:
     """The words of several passes over one screen: the same text at roughly the same place counts once."""
     kept: list[Word] = []
-    for w in sorted((w for words in passes for w in words), key=lambda w: -w.conf):
-        if any(k.text.upper() == w.text.upper() and abs(k.cx - w.cx) < max(k.w, 8) and abs(k.cy - w.cy) < max(k.h, 8)
-               for k in kept):
+    for word in sorted((word for words in passes for word in words), key=lambda word: -word.conf):
+        if any(
+            kept_word.text.upper() == word.text.upper()
+            and abs(kept_word.cx - word.cx) < max(kept_word.w, 8)
+            and abs(kept_word.cy - word.cy) < max(kept_word.h, 8)
+            for kept_word in kept
+        ):
             continue
-        kept.append(w)
+        kept.append(word)
     return kept
 
 
-def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
+def _run_tesseract(image: np.ndarray, scale: float, segmentation_mode: int) -> list[Word]:
     """One Tesseract pass over an image, with boxes scaled back to original pixels."""
-    with tempfile.NamedTemporaryFile(suffix=".png") as f:
-        cv2.imwrite(f.name, img)
-        out = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
-            ["tesseract", f.name, "stdout", "--psm", str(psm), "-l", "eng", "tsv"],
-            capture_output=True, text=True, check=True,
-            env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
-        ).stdout
-    return words_from_tsv(out, scale)
+    with tempfile.NamedTemporaryFile(suffix=".png") as png_file:
+        cv2.imwrite(png_file.name, image)
+        try:
+            tsv = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
+                ["tesseract", png_file.name, "stdout", "--psm", str(segmentation_mode), "-l", "eng", "tsv"],
+                capture_output=True,
+                text=True,
+                check=True,
+                env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
+            ).stdout
+        except subprocess.CalledProcessError as error:  # reported as one line by the commands, like a missing engine
+            stderr_lines = (error.stderr or "").strip().splitlines()
+            reason = stderr_lines[-1] if stderr_lines else f"exit status {error.returncode}"
+            raise RuntimeError(f"Tesseract failed on a screen: {reason}") from error
+    return words_from_tsv(tsv, scale)
 
 
-def _tesseract_words(img: np.ndarray, psm: int = 11) -> list[Word]:
+def _tesseract_words(image: np.ndarray, segmentation_mode: int = 11) -> list[Word]:
     """OCR an image with the Tesseract command line: every pass, merged."""
-    passes = tesseract_passes(img)
-    with ThreadPoolExecutor(max_workers=len(passes)) as ex:
-        results = ex.map(lambda p: _run_tesseract(p[0], p[1], psm), passes)
+    passes = tesseract_passes(image)
+    with ThreadPoolExecutor(max_workers=len(passes)) as executor:
+        results = executor.map(
+            lambda image_and_scale: _run_tesseract(image_and_scale[0], image_and_scale[1], segmentation_mode), passes
+        )
     return merge_passes(list(results))
 
 
 # ---------------- rapidocr ----------------
+
 
 @lru_cache(maxsize=1)
 def _rapidocr_engine():
@@ -141,29 +165,38 @@ def rapidocr_available() -> bool:
 
 def _split_line(box, text: str, score: float) -> list[Word]:
     """Split a RapidOCR text line into words, estimating each word's box from its character position."""
-    pts = np.asarray(box, dtype=float).reshape(-1, 2)
-    x0, y0 = pts.min(axis=0)
-    x1, y1 = pts.max(axis=0)
-    n = max(len(text), 1)
-    words, pos = [], 0
+    points = np.asarray(box, dtype=float).reshape(-1, 2)
+    left, top = points.min(axis=0)
+    right, bottom = points.max(axis=0)
+    length = max(len(text), 1)
+    words, end = [], 0
     for token in text.split():
-        start = text.index(token, pos)
-        pos = start + len(token)
-        wx0 = x0 + (x1 - x0) * start / n
-        wx1 = x0 + (x1 - x0) * pos / n
-        words.append(Word(token, int(wx0), int(y0), max(1, int(wx1 - wx0)), max(1, int(y1 - y0)), float(score)))
+        start = text.index(token, end)
+        end = start + len(token)
+        word_left = left + (right - left) * start / length
+        word_right = left + (right - left) * end / length
+        words.append(
+            Word(
+                token,
+                int(word_left),
+                int(top),
+                max(1, int(word_right - word_left)),
+                max(1, int(bottom - top)),
+                float(score),
+            )
+        )
     return words
 
 
-def _rapidocr_words(img: np.ndarray) -> list[Word]:
+def _rapidocr_words(image: np.ndarray) -> list[Word]:
     """OCR an image with RapidOCR and return word-level boxes."""
-    out = _rapidocr_engine()(img)
-    if isinstance(out, tuple):  # rapidocr_onnxruntime: (result, elapse); result = [[box, text, score], ...]
-        lines = [tuple(r) for r in (out[0] or [])]
-    else:                      # rapidocr >= 2: object with boxes / txts / scores
-        if out.boxes is None:
+    output = _rapidocr_engine()(image)
+    if isinstance(output, tuple):  # rapidocr_onnxruntime: (result, elapse); result = [[box, text, score], ...]
+        lines = [tuple(row) for row in (output[0] or [])]
+    else:  # rapidocr >= 2: object with boxes / txts / scores
+        if output.boxes is None:
             return []
-        lines = list(zip(out.boxes, out.txts, out.scores))
+        lines = list(zip(output.boxes, output.txts, output.scores))
     words: list[Word] = []
     for box, text, score in lines:
         words.extend(_split_line(box, str(text), float(score)))
@@ -171,6 +204,7 @@ def _rapidocr_words(img: np.ndarray) -> list[Word]:
 
 
 # ---------------- entry point ----------------
+
 
 def available_backend(preferred: str = "auto") -> str:
     """Pick the OCR backend to use, raising with install hints when none is available."""
@@ -180,15 +214,17 @@ def available_backend(preferred: str = "auto") -> str:
         return "tesseract"
     if preferred == "rapidocr":
         raise RuntimeError("RapidOCR isn't installed. In the project folder, run: pip install -e '.[ocr]'")
-    raise RuntimeError("no OCR engine found. In the project folder, run: pip install -e '.[ocr]' "
-                       "(RapidOCR), or install Tesseract (brew install tesseract / apt install tesseract-ocr)")
+    raise RuntimeError(
+        "no OCR engine found. In the project folder, run: pip install -e '.[ocr]' "
+        "(RapidOCR), or install Tesseract (brew install tesseract / apt install tesseract-ocr)"
+    )
 
 
 def read_words(image: np.ndarray | str | Path, backend: str = "auto") -> list[Word]:
     """OCR an image (array or path) and return words with pixel boxes."""
-    img = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
-    if img is None:
+    pixels = image if isinstance(image, np.ndarray) else cv2.imread(str(image))
+    if pixels is None:
         raise FileNotFoundError(image)
     if available_backend(backend) == "rapidocr":
-        return _rapidocr_words(img)
-    return _tesseract_words(img)
+        return _rapidocr_words(pixels)
+    return _tesseract_words(pixels)

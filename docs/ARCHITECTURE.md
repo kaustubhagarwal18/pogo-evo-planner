@@ -319,16 +319,20 @@ flowchart LR
 ```
 
 - **Worker.** `worker.js` is a module worker. It loads Pyodide from jsDelivr, unpacks `planner.zip`
-  and builds one `WebPlanner` with the species table. A long plan never freezes the page. Requests
-  and replies are JSON strings, so nothing needs converting between JavaScript and Python. While one
+  and builds one `WebPlanner` with the species table. A long plan never freezes the page. While one
   plan runs, only the newest edit waits for the next one.
+- **The JSON boundary.** Every method the page calls is a `@json_api` method in `webapp.py`. Its
+  arguments arrive as one JSON object of keyword arguments, and its plain Python reply goes back as
+  JSON, so nothing needs converting between JavaScript and Python. A mistake the player can fix
+  raises `InputError`, which becomes `{"error": message}`; the worker's `api()` turns that into an
+  error the page shows. Any other exception is a bug, shown as "The planner hit an error".
 - **What `WebPlanner` returns.** `plan_json` gives the text report, the dashboard page and the
   Rare Candy totals. It also lists what the plan is missing: families without a candy count
   (`families_missing_candy`), and evolution items the inventory doesn't list that an owned Pokémon
   needs, at any depth, to reach a species the plan counts as new (`items_to_ask`, by the planner's
-  own `gives_new_species`: with new entries only, a species already registered doesn't count). An unlisted item is
-  unknown, so the page asks for it, as it does for a missing candy count. A bad inventory comes back
-  as `{"error": ...}`, in one line.
+  own `gives_new_species`: with new entries only, a species already registered doesn't count). An
+  unlisted item is unknown, so the page asks for it, as it does for a missing candy count. An
+  inventory that isn't valid raises `InputError`, naming what's wrong.
 - **Start.** A first visit opens the bundled example (`inventory_sample.json`) under a start card
   offering the two ways in: screenshots or an inventory file. The example is replaced without a
   question; the player's own inventory only after they confirm, and **Close** goes back to the

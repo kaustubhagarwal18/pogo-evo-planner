@@ -22,8 +22,26 @@ Before 1.0, a new minor version may change commands or file formats.
 - The `pages` workflow builds the site with the latest game master and publishes it: on pushes
   to `main`, every Monday, and by hand.
 
+### Changed
+
+- The Python code is formatted with `ruff format` (`make format`), and `make lint` and CI check it.
+- The browser app's Python methods are `@json_api` methods: one JSON object in, JSON out, and an
+  `InputError` for a mistake the player can fix.
+- Variables have descriptive names throughout the Python and the browser app (`specimen`, `family`,
+  `species_id` rather than `s`, `f`, `sp`), with no change in behaviour.
+
 ### Fixed
 
+- One readable line instead of a traceback when:
+  - an output file can't be written (a dashboard or inventory path in a folder that doesn't exist);
+  - Tesseract itself fails on a screen;
+  - Ctrl-C stops a command, which now exits with code 130.
+
+  `make web` also names a species file it can't read.
+- In the browser app:
+  - a screenshot that can't be read is marked failed with its reason, and the others are still read;
+  - planning no longer stops for good after a failed plan call;
+  - the scan's temporary files are removed even when merging the screenshots fails.
 - A Sinnoh Stone listed as `ITEM_SINNOH_STONE`, as `docs/CAPTURING.md` showed, was never used. The
   game data's id is `ITEM_GEN4_EVOLUTION_STONE`, and the bundled sample data had the same wrong id,
   so the demo only worked with the sample species. Inventory files now take evolution items by the

@@ -470,7 +470,10 @@ for what's next and [CHANGELOG.md](CHANGELOG.md) for what each version changed.
 
 - `make test`: all tests, including end-to-end OCR (about 30 s).
 - `make test-fast`: skips the OCR end-to-end test.
-- `make lint`: ruff, pylint, mypy, bandit, codespell, and gitleaks if installed.
+- `make lint`: ruff (lint, and a check that the code is formatted), pylint, mypy, bandit,
+  codespell, and gitleaks if installed.
+- `make format`: formats the Python code with `ruff format`. Run it before committing, rather
+  than formatting by hand.
 - `make web`: builds the browser app into `site/`; `make serve` also serves it at
   http://localhost:8000.
 
@@ -482,7 +485,8 @@ runs. Three GitHub Actions workflows run on GitHub:
   without a pull request. `test` uses the Tesseract backend on Python 3.10 to 3.14;
   `test-rapidocr` uses RapidOCR (non-blocking).
 - **ci** (`.github/workflows/ci.yml`), on pushes to `main` and on pull requests: `lint` (ruff,
-  pylint, mypy, bandit, codespell) and `secrets` (gitleaks over the full git history).
+  ruff format, pylint, mypy, bandit, codespell) and `secrets` (gitleaks over the full git
+  history).
 - **pages** (`.github/workflows/pages.yml`): builds the browser app with the latest game master
   and publishes it on GitHub Pages, on pushes to `main`, every Monday (so new species arrive
   without a code change) and by hand. It needs Pages switched on once, under Settings → Pages →

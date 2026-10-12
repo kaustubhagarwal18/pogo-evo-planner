@@ -25,42 +25,45 @@ SPECIES = load_species(ROOT / "pogo_evo_planner/data/species_sample.json")
 TIERS = json.loads((ROOT / "pogo_evo_planner/data/rarity_tiers.json").read_text())
 
 
-def brute_force(inv: Inventory, settings: Settings) -> float:
+def brute_force(inventory: Inventory, settings: Settings) -> float:
     """Try every combination of paths for the specimens the planner keeps (duplicates dropped)."""
-    kept = keep_specimens(inv.pokemon, SPECIES, owned_species(inv, SPECIES))
-    per_spec = [enumerate_paths(s, SPECIES, settings, []) for s in kept]
-    owned = with_earlier_stages({s.species for s in inv.pokemon}, SPECIES)
+    kept = keep_specimens(inventory.pokemon, SPECIES, owned_species(inventory, SPECIES))
+    paths_per_specimen = [enumerate_paths(specimen, SPECIES, settings, []) for specimen in kept]
+    owned = with_earlier_stages({specimen.species for specimen in inventory.pokemon}, SPECIES)
     from_base = candy_from_base(SPECIES)
     best = 0.0
-    for combo in itertools.product(*per_spec):
+    for combo in itertools.product(*paths_per_specimen):
         candy, items, targets = Counter(), Counter(), {}
-        for p in combo:
-            candy[SPECIES[p.specimen.species]["family"]] += p.candy
-            items += p.items
-            for t in p.targets:
-                if t not in inv.pokedex and t not in owned:
-                    targets[t] = True
-        rare = sum(max(0, c - inv.candy.get(f, 0)) for f, c in candy.items())
-        if rare > inv.rare_candy or any(inv.items.get(k, 0) < v for k, v in items.items()):
+        for path in combo:
+            candy[SPECIES[path.specimen.species]["family"]] += path.candy
+            items += path.items
+            for target in path.targets:
+                if target not in inventory.pokedex and target not in owned:
+                    targets[target] = True
+        rare = sum(max(0, count - inventory.candy.get(family, 0)) for family, count in candy.items())
+        if rare > inventory.rare_candy or any(inventory.items.get(item, 0) < needed for item, needed in items.items()):
             continue
         # paths into a new species: at most one per species is the first copy, every other path is a repeat
         groups: dict[str, list[int]] = {}
-        for i, p in enumerate(combo):
-            if p.steps and p.targets[-1] not in owned:
-                groups.setdefault(p.targets[-1], []).append(i)
-        for pick in itertools.product(*[[None, *idx] for idx in groups.values()]):
-            first = {i for i in pick if i is not None}
+        for index, path in enumerate(combo):
+            if path.steps and path.targets[-1] not in owned:
+                groups.setdefault(path.targets[-1], []).append(index)
+        for pick in itertools.product(*[[None, *indexes] for indexes in groups.values()]):
+            first = {index for index in pick if index is not None}
             value, repeat_candy = 0.0, Counter()
-            for i, p in enumerate(combo):
-                fam = SPECIES[p.specimen.species]["family"]
-                cpc = cost_per_candy(fam, SPECIES, TIERS)[1]
-                if i in first:
-                    value += from_base[p.targets[-1]] * cpc
+            for index, path in enumerate(combo):
+                family = SPECIES[path.specimen.species]["family"]
+                candy_value = cost_per_candy(family, SPECIES, TIERS)[1]
+                if index in first:
+                    value += from_base[path.targets[-1]] * candy_value
                 else:
-                    value += p.candy * cpc * settings.repeat_value
-                    repeat_candy[fam] += p.candy
+                    value += path.candy * candy_value * settings.repeat_value
+                    repeat_candy[family] += path.candy
             # repeats may only use own candy left over after the family's new evolutions
-            if any(c > max(0, inv.candy.get(f, 0) - (candy[f] - c)) for f, c in repeat_candy.items()):
+            if any(
+                count > max(0, inventory.candy.get(family, 0) - (candy[family] - count))
+                for family, count in repeat_candy.items()
+            ):
                 continue
             best = max(best, value + settings.dex_bonus * len(targets))
     return best
@@ -70,188 +73,266 @@ class PlannerTests(unittest.TestCase):
     def test_matches_brute_force_on_random_inventories(self):
         """On 60 random inventories the plan's value equals a brute-force search of every combination."""
         rng = random.Random(7)
-        pool = ["DRATINI", "DRAGONAIR", "BELDUM", "FEEBAS", "EEVEE", "ONIX", "SCYTHER",
-                "KIRLIA", "MAGIKARP", "GASTLY", "PIDGEY", "CHANSEY"]
+        pool = [
+            "DRATINI",
+            "DRAGONAIR",
+            "BELDUM",
+            "FEEBAS",
+            "EEVEE",
+            "ONIX",
+            "SCYTHER",
+            "KIRLIA",
+            "MAGIKARP",
+            "GASTLY",
+            "PIDGEY",
+            "CHANSEY",
+        ]
         for _ in range(60):
-            mons = [Specimen(s, None, f"#{i}") for i, s in enumerate(rng.choices(pool, k=rng.randint(1, 4)))]
-            fams = {SPECIES[m.species]["family"] for m in mons}
-            inv = Inventory(
+            mons = [
+                Specimen(species_id, None, f"#{index}")
+                for index, species_id in enumerate(rng.choices(pool, k=rng.randint(1, 4)))
+            ]
+            families = {SPECIES[specimen.species]["family"] for specimen in mons}
+            inventory = Inventory(
                 rare_candy=rng.choice([0, 10, 40, 75, 120, 200]),
-                candy={f: rng.choice([0, 12, 25, 50, 90, 130, 380]) for f in fams},
+                candy={family: rng.choice([0, 12, 25, 50, 90, 130, 380]) for family in families},
                 items={"ITEM_METAL_COAT": rng.randint(0, 1), "ITEM_GEN4_EVOLUTION_STONE": rng.randint(0, 1)},
                 pokedex=set(rng.sample(sorted(SPECIES), 15)),
                 pokemon=mons,
             )
             settings = Settings(dex_bonus=rng.choice([0, 20, 500]), repeat_value=rng.choice([0.0, 0.1, 1.0]))
-            got = plan(SPECIES, TIERS, inv, settings)
-            self.assertAlmostEqual(got.total_value, brute_force(inv, settings), places=6, msg=str(inv))
-            self.assertLessEqual(got.rare_candy_used, inv.rare_candy)
+            got = plan(SPECIES, TIERS, inventory, settings)
+            self.assertAlmostEqual(got.total_value, brute_force(inventory, settings), places=6, msg=str(inventory))
+            self.assertLessEqual(got.rare_candy_used, inventory.rare_candy)
 
     def test_prefers_high_effort_family(self):
         """Rare Candy goes to the family whose candy costs more walking (Feebas over Magikarp)."""
         # 70 rare candy can finish Feebas (20 km buddy) or Magikarp (1 km) but not both.
-        inv = Inventory(70, {"FEEBAS": 30, "MAGIKARP": 330}, {}, set(),
-                        [Specimen("FEEBAS"), Specimen("MAGIKARP")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual([f.family for f in p.families if f.rare_candy], ["FEEBAS"])
+        inventory = Inventory(
+            70, {"FEEBAS": 30, "MAGIKARP": 330}, {}, set(), [Specimen("FEEBAS"), Specimen("MAGIKARP")]
+        )
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(
+            [family_plan.family for family_plan in evolution_plan.families if family_plan.rare_candy], ["FEEBAS"]
+        )
 
     def test_evolving_into_owned_species_is_a_discounted_repeat(self):
         """Evolving into a species you own counts only repeat_value of the candy it spends."""
-        cpc = cost_per_candy("DRATINI", SPECIES, TIERS)[1]
+        candy_value = cost_per_candy("DRATINI", SPECIES, TIERS)[1]
         settings = Settings(dex_bonus=20, repeat_value=0.1)
         new = plan(SPECIES, TIERS, Inventory(100, {"DRATINI": 0}, {}, set(), [Specimen("DRAGONAIR")]), settings)
         # a new Dragonite is worth the candy from Dratini (25 + 100), whatever stage it is evolved from
-        self.assertAlmostEqual(new.total_value, 125 * cpc + 20)
+        self.assertAlmostEqual(new.total_value, 125 * candy_value + 20)
         # already owning a Dragonite: the evolution is a repeat, registers nothing new,
         # and Rare Candy can't pay for it...
         rep_inv = Inventory(100, {"DRATINI": 0}, {}, set(), [Specimen("DRAGONAIR"), Specimen("DRAGONITE")])
         self.assertEqual(plan(SPECIES, TIERS, rep_inv, settings).total_value, 0)
         # ...but your own candy can
         rep_inv.candy["DRATINI"] = 100
-        self.assertAlmostEqual(plan(SPECIES, TIERS, rep_inv, settings).total_value, 100 * cpc * 0.1)
+        self.assertAlmostEqual(plan(SPECIES, TIERS, rep_inv, settings).total_value, 100 * candy_value * 0.1)
 
     def test_rare_candy_prefers_a_new_species_over_a_repeat(self):
         """Rare Candy completes a new species rather than a repeat of one you own."""
         # 100 Rare Candy finishes one evolution. Feebas (20 km buddy) is worth more per candy,
         # but Milotic is already owned while Dragonite is not.
-        inv = Inventory(100, {"DRATINI": 0, "FEEBAS": 0}, {}, set(),
-                        [Specimen("FEEBAS"), Specimen("MILOTIC"), Specimen("DRAGONAIR")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual([f.family for f in p.families], ["DRATINI"])
+        inventory = Inventory(
+            100,
+            {"DRATINI": 0, "FEEBAS": 0},
+            {},
+            set(),
+            [Specimen("FEEBAS"), Specimen("MILOTIC"), Specimen("DRAGONAIR")],
+        )
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual([family_plan.family for family_plan in evolution_plan.families], ["DRATINI"])
         # even with no repeat discount, Rare Candy never goes to the species you already have
-        p = plan(SPECIES, TIERS, inv, Settings(repeat_value=1.0))
-        self.assertEqual([f.family for f in p.families if f.rare_candy], ["DRATINI"])
+        evolution_plan = plan(SPECIES, TIERS, inventory, Settings(repeat_value=1.0))
+        self.assertEqual(
+            [family_plan.family for family_plan in evolution_plan.families if family_plan.rare_candy], ["DRATINI"]
+        )
 
     def test_new_species_reached_from_owned_middle_stage(self):
         """A new species is reached from the owned middle stage, the cheaper route."""
         # Dragonite is new. Dragonair -> Dragonite (100) and Dratini -> Dragonair -> Dragonite (125)
         # both get it; the cheaper route from the owned Dragonair should win.
-        inv = Inventory(125, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONAIR")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual(p.rare_candy_used, 100)
-        self.assertEqual([path.specimen.species for f in p.families for path in f.paths], ["DRAGONAIR"])
+        inventory = Inventory(125, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONAIR")])
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(evolution_plan.rare_candy_used, 100)
+        self.assertEqual(
+            [path.specimen.species for family_plan in evolution_plan.families for path in family_plan.paths],
+            ["DRAGONAIR"],
+        )
 
     def test_rare_candy_never_spent_on_a_species_you_have(self):
         """No Rare Candy is spent on an evolution into a species you already have."""
         # Milotic is owned. Even when repeats keep their full value, Rare Candy can't pay for one...
-        inv = Inventory(100, {"FEEBAS": 0}, {}, set(), [Specimen("FEEBAS"), Specimen("MILOTIC")])
-        p = plan(SPECIES, TIERS, inv, Settings(repeat_value=1.0))
-        self.assertEqual((p.rare_candy_used, p.families), (0, []))
+        inventory = Inventory(100, {"FEEBAS": 0}, {}, set(), [Specimen("FEEBAS"), Specimen("MILOTIC")])
+        evolution_plan = plan(SPECIES, TIERS, inventory, Settings(repeat_value=1.0))
+        self.assertEqual((evolution_plan.rare_candy_used, evolution_plan.families), (0, []))
         # ...but your own Feebas candy can
-        inv.candy["FEEBAS"] = 100
-        p = plan(SPECIES, TIERS, inv, Settings(repeat_value=1.0))
-        self.assertEqual((p.rare_candy_used, [f.family for f in p.families]), (0, ["FEEBAS"]))
+        inventory.candy["FEEBAS"] = 100
+        evolution_plan = plan(SPECIES, TIERS, inventory, Settings(repeat_value=1.0))
+        self.assertEqual(
+            (evolution_plan.rare_candy_used, [family_plan.family for family_plan in evolution_plan.families]),
+            (0, ["FEEBAS"]),
+        )
 
     def test_repeat_does_not_push_rare_candy_onto_a_new_evolution(self):
         """A repeat uses only own candy left over, so it can't push Rare Candy onto a new evolution."""
         # Dragonite is new (100 from Dragonair); Dratini -> Dragonair is a repeat (25).
         # With 90 own candy, doing both would need 35 Rare Candy, 25 of them only because of the repeat.
-        inv = Inventory(100, {"DRATINI": 90}, {}, set(),
-                        [Specimen("DRATINI"), Specimen("DRAGONAIR"), Specimen("DRAGONAIR")])
-        p = plan(SPECIES, TIERS, inv, Settings(repeat_value=1.0))
-        self.assertEqual(p.rare_candy_used, 10)
+        inventory = Inventory(
+            100, {"DRATINI": 90}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONAIR"), Specimen("DRAGONAIR")]
+        )
+        evolution_plan = plan(SPECIES, TIERS, inventory, Settings(repeat_value=1.0))
+        self.assertEqual(evolution_plan.rare_candy_used, 10)
 
     def test_never_caught_beats_a_storage_reading(self):
         """A silhouette on an Evolve button beats a storage reading of that species."""
         # storage claims a Dragonite, but an Evolve button showed it as a silhouette: it's a misread
-        inv = Inventory(100, {"DRATINI": 0}, {}, set(), [Specimen("DRAGONAIR"), Specimen("DRAGONITE")],
-                        not_caught={"DRAGONITE"})
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual([path.targets for f in p.families for path in f.paths], [["DRAGONITE"]])
+        inventory = Inventory(
+            100, {"DRATINI": 0}, {}, set(), [Specimen("DRAGONAIR"), Specimen("DRAGONITE")], not_caught={"DRAGONITE"}
+        )
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(
+            [path.targets for family_plan in evolution_plan.families for path in family_plan.paths], [["DRAGONITE"]]
+        )
 
     def test_plain_name_covers_its_forms(self):
         """A plain species name covers all its forms; a specific form covers only itself."""
         species = {
-            "TANDEMAUS": {"dex": 924, "family": "TANDEMAUS", "buddy_km": 1, "evolutions": [
-                {"to": "MAUSHOLD_FAMILY_OF_FOUR", "candy": 50}, {"to": "MAUSHOLD_FAMILY_OF_THREE", "candy": 50}]},
+            "TANDEMAUS": {
+                "dex": 924,
+                "family": "TANDEMAUS",
+                "buddy_km": 1,
+                "evolutions": [
+                    {"to": "MAUSHOLD_FAMILY_OF_FOUR", "candy": 50},
+                    {"to": "MAUSHOLD_FAMILY_OF_THREE", "candy": 50},
+                ],
+            },
             "MAUSHOLD": {"dex": 925, "family": "TANDEMAUS", "buddy_km": 1},
             "MAUSHOLD_FAMILY_OF_FOUR": {"dex": 925, "family": "TANDEMAUS", "buddy_km": 1},
             "MAUSHOLD_FAMILY_OF_THREE": {"dex": 925, "family": "TANDEMAUS", "buddy_km": 1},
             "PORYGON": {"dex": 137, "family": "PORYGON", "buddy_km": 3},
             "PORYGON_Z": {"dex": 474, "family": "PORYGON", "buddy_km": 3},
         }
-        self.assertEqual(with_forms({"MAUSHOLD"}, species),
-                         {"MAUSHOLD", "MAUSHOLD_FAMILY_OF_FOUR", "MAUSHOLD_FAMILY_OF_THREE"})
+        self.assertEqual(
+            with_forms({"MAUSHOLD"}, species), {"MAUSHOLD", "MAUSHOLD_FAMILY_OF_FOUR", "MAUSHOLD_FAMILY_OF_THREE"}
+        )
         self.assertEqual(with_forms({"MAUSHOLD_FAMILY_OF_FOUR"}, species), {"MAUSHOLD_FAMILY_OF_FOUR"})
         self.assertEqual(with_forms({"PORYGON"}, species), {"PORYGON"})  # different dex number
-        inv = Inventory(50, {"TANDEMAUS": 0}, {}, set(), [Specimen("TANDEMAUS"), Specimen("MAUSHOLD")])
-        self.assertEqual(plan(species, TIERS, inv).families, [])
+        inventory = Inventory(50, {"TANDEMAUS": 0}, {}, set(), [Specimen("TANDEMAUS"), Specimen("MAUSHOLD")])
+        self.assertEqual(plan(species, TIERS, inventory).families, [])
 
     def test_no_rare_candy_for_a_family_without_a_candy_count(self):
         """A family with no candy count is unknown, not 0: no Rare Candy goes to it, and the plan says so."""
-        inv = Inventory(200, {}, {}, set(), [Specimen("DRATINI")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual((p.rare_candy_used, p.families, p.no_candy_count), (0, [], ["DRATINI"]))
-        inv.candy["DRATINI"] = 0       # a known count of 0 can be topped up: Dratini -> Dragonair -> Dragonite
-        self.assertEqual(plan(SPECIES, TIERS, inv).rare_candy_used, 125)
+        inventory = Inventory(200, {}, {}, set(), [Specimen("DRATINI")])
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(
+            (evolution_plan.rare_candy_used, evolution_plan.families, evolution_plan.no_candy_count),
+            (0, [], ["DRATINI"]),
+        )
+        inventory.candy["DRATINI"] = 0  # a known count of 0 can be topped up: Dratini -> Dragonair -> Dragonite
+        self.assertEqual(plan(SPECIES, TIERS, inventory).rare_candy_used, 125)
 
     def test_candy_count_only_missing_where_it_matters(self):
         """A missing candy count is reported only for families that can still evolve into something new."""
-        inv = Inventory(0, {}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONITE"),  # nothing new left
-                                           Specimen("FEEBAS"),                           # Milotic is new
-                                           Specimen("SCYTHER")])
-        inv.candy["SCYTHER"] = 50                                                       # count known
-        self.assertEqual(families_missing_candy(inv, SPECIES), ["FEEBAS"])
+        inventory = Inventory(
+            0,
+            {},
+            {},
+            set(),
+            [
+                Specimen("DRATINI"),
+                Specimen("DRAGONITE"),  # nothing new left
+                Specimen("FEEBAS"),  # Milotic is new
+                Specimen("SCYTHER"),
+            ],
+        )
+        inventory.candy["SCYTHER"] = 50  # count known
+        self.assertEqual(families_missing_candy(inventory, SPECIES), ["FEEBAS"])
 
     def test_owning_final_stage_covers_middle_stage(self):
         """Owning the final stage means the middle stage isn't new either."""
         # Dragonite is owned, so Dratini -> Dragonair gives nothing new
-        inv = Inventory(25, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONITE")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual(p.families, [])
+        inventory = Inventory(25, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI"), Specimen("DRAGONITE")])
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(evolution_plan.families, [])
         self.assertEqual(with_earlier_stages({"DRAGONITE"}, SPECIES), {"DRATINI", "DRAGONAIR", "DRAGONITE"})
 
     def test_duplicates_dropped_so_a_later_middle_stage_is_kept(self):
         """Duplicate copies are dropped, so a middle stage listed after them is still planned."""
         # seven Dratini listed before the only Dragonair:
         # Dragonair -> Dragonite (100 candy) fits, Dratini's route (125) doesn't
-        inv = Inventory(0, {"DRATINI": 100}, {}, set(),
-                        [Specimen("DRATINI", label=f"#{i}") for i in range(7)] +
-                        [Specimen("DRAGONAIR", label="a"), Specimen("DRAGONAIR", label="b")])
-        paths = [path for f in plan(SPECIES, TIERS, inv).families for path in f.paths]
-        self.assertEqual([(p.specimen.label, p.targets) for p in paths], [("a", ["DRAGONITE"])])
+        inventory = Inventory(
+            0,
+            {"DRATINI": 100},
+            {},
+            set(),
+            [Specimen("DRATINI", label=f"#{index}") for index in range(7)]
+            + [Specimen("DRAGONAIR", label="a"), Specimen("DRAGONAIR", label="b")],
+        )
+        paths = [path for family_plan in plan(SPECIES, TIERS, inventory).families for path in family_plan.paths]
+        self.assertEqual(
+            [(evolution_plan.specimen.label, evolution_plan.targets) for evolution_plan in paths],
+            [("a", ["DRAGONITE"])],
+        )
 
     def test_branching_species_keep_one_copy_per_branch(self):
         """A branching species keeps one copy per unowned final evolution; other species keep one."""
-        mons = [Specimen(s, label=f"#{i}") for i, s in enumerate(["EEVEE"] * 10 + ["KIRLIA"] * 3 + ["DRATINI"] * 3)]
-        kept = Counter(s.species for s in keep_specimens(mons, SPECIES))
+        mons = [
+            Specimen(species_id, label=f"#{index}")
+            for index, species_id in enumerate(["EEVEE"] * 10 + ["KIRLIA"] * 3 + ["DRATINI"] * 3)
+        ]
+        kept = Counter(species_id.species for species_id in keep_specimens(mons, SPECIES))
         self.assertEqual(kept, {"EEVEE": 8, "KIRLIA": 2, "DRATINI": 1})
         # branches you already own don't need a copy
-        kept = Counter(s.species for s in keep_specimens(mons, SPECIES, {"VAPOREON", "JOLTEON", "GALLADE"}))
+        kept = Counter(
+            species_id.species for species_id in keep_specimens(mons, SPECIES, {"VAPOREON", "JOLTEON", "GALLADE"})
+        )
         self.assertEqual(kept, {"EEVEE": 6, "KIRLIA": 1, "DRATINI": 1})
         # two Kirlia can become Gardevoir and Gallade
-        inv = Inventory(0, {"RALTS": 200}, {"ITEM_GEN4_EVOLUTION_STONE": 1}, set(),
-                        [Specimen("KIRLIA", label="a"), Specimen("KIRLIA", label="b"), Specimen("KIRLIA", label="c")])
-        targets = sorted(path.targets[-1] for f in plan(SPECIES, TIERS, inv).families for path in f.paths)
+        inventory = Inventory(
+            0,
+            {"RALTS": 200},
+            {"ITEM_GEN4_EVOLUTION_STONE": 1},
+            set(),
+            [Specimen("KIRLIA", label="a"), Specimen("KIRLIA", label="b"), Specimen("KIRLIA", label="c")],
+        )
+        targets = sorted(
+            path.targets[-1] for family_plan in plan(SPECIES, TIERS, inventory).families for path in family_plan.paths
+        )
         self.assertEqual(targets, ["GALLADE", "GARDEVOIR"])
 
     def test_partial_top_up_is_not_spent(self):
         """Rare Candy isn't spent when it can't complete an evolution."""
-        inv = Inventory(10, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual(p.rare_candy_used, 0)
-        self.assertEqual(p.families, [])
+        inventory = Inventory(10, {"DRATINI": 0}, {}, set(), [Specimen("DRATINI")])
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(evolution_plan.rare_candy_used, 0)
+        self.assertEqual(evolution_plan.families, [])
 
     def test_shared_item_used_once(self):
         """One Metal Coat is used for one evolution, not two."""
-        inv = Inventory(0, {"ONIX": 50, "SCYTHER": 50}, {"ITEM_METAL_COAT": 1}, set(),
-                        [Specimen("ONIX"), Specimen("SCYTHER")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual(len(p.families), 1)
+        inventory = Inventory(
+            0, {"ONIX": 50, "SCYTHER": 50}, {"ITEM_METAL_COAT": 1}, set(), [Specimen("ONIX"), Specimen("SCYTHER")]
+        )
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(len(evolution_plan.families), 1)
 
     def test_trade_evolutions_suggested_not_paid(self):
         """An evolution that's free by trading is suggested as a trade, not paid for in candy."""
-        inv = Inventory(100, {"GASTLY": 0}, {}, set(), [Specimen("HAUNTER")])
-        p = plan(SPECIES, TIERS, inv)
-        self.assertEqual(p.rare_candy_used, 0)
-        self.assertEqual([s.to for _, s in p.trade_instead], ["GENGAR"])
+        inventory = Inventory(100, {"GASTLY": 0}, {}, set(), [Specimen("HAUNTER")])
+        evolution_plan = plan(SPECIES, TIERS, inventory)
+        self.assertEqual(evolution_plan.rare_candy_used, 0)
+        self.assertEqual([step.to for _, step in evolution_plan.trade_instead], ["GENGAR"])
 
     def test_items_by_the_names_players_use(self):
         """Items named as players know them are keyed by the game's ids; an unknown one keeps its key, and the same
         item under two names is an error rather than a guess."""
-        inv = inventory_from_dict({"items": {"Sinnoh Stone": 1, "metal coat": 2, "Moon Stone": 3}}, species=SPECIES)
-        self.assertEqual(inv.items, {"ITEM_GEN4_EVOLUTION_STONE": 1, "ITEM_METAL_COAT": 2, "Moon Stone": 3})
-        old = inventory_from_dict({"items": {"ITEM_SINNOH_STONE": 1}}, species=SPECIES)   # the docs' old example
+        inventory = inventory_from_dict(
+            {"items": {"Sinnoh Stone": 1, "metal coat": 2, "Moon Stone": 3}}, species=SPECIES
+        )
+        self.assertEqual(inventory.items, {"ITEM_GEN4_EVOLUTION_STONE": 1, "ITEM_METAL_COAT": 2, "Moon Stone": 3})
+        old = inventory_from_dict({"items": {"ITEM_SINNOH_STONE": 1}}, species=SPECIES)  # the docs' old example
         self.assertEqual(old.items, {"ITEM_GEN4_EVOLUTION_STONE": 1})
         with self.assertRaisesRegex(ValueError, "lists Sinnoh Stone twice"):
             inventory_from_dict({"items": {"Sinnoh Stone": 1, "ITEM_GEN4_EVOLUTION_STONE": 1}}, species=SPECIES)
@@ -259,41 +340,70 @@ class PlannerTests(unittest.TestCase):
 
     def test_items_no_evolution_uses_are_reported(self):
         """An item no evolution needs, like a misspelt one, is listed in the plan rather than silently ignored."""
-        inv = Inventory(0, {}, {"Sinoh Stone": 1, "ITEM_METAL_COAT": 1}, set(), [])
-        self.assertEqual(plan(SPECIES, TIERS, inv).unknown_items, ["Sinoh Stone"])
+        inventory = Inventory(0, {}, {"Sinoh Stone": 1, "ITEM_METAL_COAT": 1}, set(), [])
+        self.assertEqual(plan(SPECIES, TIERS, inventory).unknown_items, ["Sinoh Stone"])
 
     def test_sample_data_uses_the_game_masters_item_ids(self):
         """The bundled species and example name items by the game master's ids, never by a player's name made into
         an id (ITEM_SINNOH_STONE for ITEM_GEN4_EVOLUTION_STONE), which the real game data doesn't match."""
-        made_up = {"ITEM_" + name.upper().replace(" ", "_").replace("-", "_").replace("'", "")
-                   for name in ITEM_NAMES.values()} - set(ITEM_NAMES)
+        made_up = {
+            "ITEM_" + name.upper().replace(" ", "_").replace("-", "_").replace("'", "") for name in ITEM_NAMES.values()
+        } - set(ITEM_NAMES)
         example = json.loads((ROOT / "examples/inventory_sample.json").read_text(encoding="utf-8"))
         self.assertEqual(made_up & (evolution_items(SPECIES) | set(example["items"])), set())
 
     def test_parse_raw_game_master(self):
         """A raw PokeMiners game master entry is parsed into the species table format."""
         raw = [
-            {"templateId": "V0147_POKEMON_DRATINI", "data": {"pokemonSettings": {
-                "pokemonId": "DRATINI", "familyId": "FAMILY_DRATINI", "kmBuddyDistance": 5,
-                "evolutionBranch": [{"evolution": "DRAGONAIR", "candyCost": 25}]}}},
-            {"templateId": "V0094_POKEMON_HAUNTER", "data": {"pokemonSettings": {
-                "pokemonId": "HAUNTER", "familyId": "FAMILY_GASTLY", "kmBuddyDistance": 3,
-                "candyToEvolve": 100,
-                "evolutionBranch": [{"evolution": "GENGAR", "noCandyCostViaTrade": True},
-                                    {"temporaryEvolution": "TEMP_EVOLUTION_MEGA"}]}}},
-            {"templateId": "V0019_POKEMON_RATTATA_ALOLA", "data": {"pokemonSettings": {
-                "pokemonId": "RATTATA", "form": "RATTATA_ALOLA", "familyId": "FAMILY_RATTATA",
-                "evolutionBranch": [{"evolution": "RATICATE", "form": "RATICATE_ALOLA", "candyCost": 25}]}}},
+            {
+                "templateId": "V0147_POKEMON_DRATINI",
+                "data": {
+                    "pokemonSettings": {
+                        "pokemonId": "DRATINI",
+                        "familyId": "FAMILY_DRATINI",
+                        "kmBuddyDistance": 5,
+                        "evolutionBranch": [{"evolution": "DRAGONAIR", "candyCost": 25}],
+                    }
+                },
+            },
+            {
+                "templateId": "V0094_POKEMON_HAUNTER",
+                "data": {
+                    "pokemonSettings": {
+                        "pokemonId": "HAUNTER",
+                        "familyId": "FAMILY_GASTLY",
+                        "kmBuddyDistance": 3,
+                        "candyToEvolve": 100,
+                        "evolutionBranch": [
+                            {"evolution": "GENGAR", "noCandyCostViaTrade": True},
+                            {"temporaryEvolution": "TEMP_EVOLUTION_MEGA"},
+                        ],
+                    }
+                },
+            },
+            {
+                "templateId": "V0019_POKEMON_RATTATA_ALOLA",
+                "data": {
+                    "pokemonSettings": {
+                        "pokemonId": "RATTATA",
+                        "form": "RATTATA_ALOLA",
+                        "familyId": "FAMILY_RATTATA",
+                        "evolutionBranch": [{"evolution": "RATICATE", "form": "RATICATE_ALOLA", "candyCost": 25}],
+                    }
+                },
+            },
             {"templateId": "ITEM_POTION", "data": {}},
         ]
-        sp = parse_game_master(raw)
-        self.assertEqual(sp["DRATINI"]["evolutions"][0], {"to": "DRAGONAIR", "candy": 25, "item": None,
-                                                         "trade_free": False, "notes": []})
-        self.assertEqual(sp["HAUNTER"]["family"], "GASTLY")
-        self.assertEqual(len(sp["HAUNTER"]["evolutions"]), 1)
-        self.assertTrue(sp["HAUNTER"]["evolutions"][0]["trade_free"])
-        self.assertEqual(sp["HAUNTER"]["evolutions"][0]["candy"], 100)
-        self.assertEqual(sp["RATTATA_ALOLA"]["evolutions"][0]["to"], "RATICATE_ALOLA")
+        species_table = parse_game_master(raw)
+        self.assertEqual(
+            species_table["DRATINI"]["evolutions"][0],
+            {"to": "DRAGONAIR", "candy": 25, "item": None, "trade_free": False, "notes": []},
+        )
+        self.assertEqual(species_table["HAUNTER"]["family"], "GASTLY")
+        self.assertEqual(len(species_table["HAUNTER"]["evolutions"]), 1)
+        self.assertTrue(species_table["HAUNTER"]["evolutions"][0]["trade_free"])
+        self.assertEqual(species_table["HAUNTER"]["evolutions"][0]["candy"], 100)
+        self.assertEqual(species_table["RATTATA_ALOLA"]["evolutions"][0]["to"], "RATICATE_ALOLA")
 
 
 if __name__ == "__main__":
