@@ -25,6 +25,8 @@ Before 1.0, a new minor version may change commands or file formats.
 ### Changed
 
 - The Python code is formatted with `ruff format` (`make format`), and `make lint` and CI check it.
+- Variables have descriptive names throughout the Python and the browser app (`specimen`, `family`,
+  `species_id` rather than `s`, `f`, `sp`), with no change in behaviour.
 
 ### Fixed
 

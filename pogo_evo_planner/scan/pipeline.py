@@ -33,19 +33,19 @@ class ScanReport:
 
 def load_images(paths: Sequence[str | Path], fps: float = 3.0) -> list[tuple[str, np.ndarray]]:
     """Expand a mix of image and video paths into (label, frame) pairs."""
-    out = []
-    for p in map(Path, paths):
-        if not p.is_file():
-            raise ValueError(f"can't read {p}: not found")
-        if p.suffix.lower() in VIDEO_EXT:
-            for i, frame in enumerate(extract_frames(p, fps=fps)):
-                out.append((f"{p.name}#{i}", frame))
+    frames = []
+    for path in map(Path, paths):
+        if not path.is_file():
+            raise ValueError(f"can't read {path}: not found")
+        if path.suffix.lower() in VIDEO_EXT:
+            for index, frame in enumerate(extract_frames(path, fps=fps)):
+                frames.append((f"{path.name}#{index}", frame))
         else:
-            img = cv2.imread(str(p))
-            if img is None:
-                raise ValueError(f"can't read {p}: not an image")
-            out.append((p.name, img))
-    return out
+            image = cv2.imread(str(path))
+            if image is None:
+                raise ValueError(f"can't read {path}: not an image")
+            frames.append((path.name, image))
+    return frames
 
 
 _STAMP = re.compile(r"(20\d{2})(\d{2})(\d{2})[-_ ]?(\d{2})(\d{2})(\d{2})")
@@ -54,11 +54,11 @@ _STAMP = re.compile(r"(20\d{2})(\d{2})(\d{2})[-_ ]?(\d{2})(\d{2})(\d{2})")
 def taken_at(path: str | Path) -> float:
     """When a screenshot or recording was taken: the date and time in its file name
     (Screenshot_20261011-115015.png, VID_20261004_225901.mp4), else when the file was last modified."""
-    m = _STAMP.search(Path(path).name)
-    if m:
+    stamp = _STAMP.search(Path(path).name)
+    if stamp:
         try:
             # phones name files in local time, with no time zone; strptime rejects impossible dates
-            return time.mktime(time.strptime("".join(m.groups()), "%Y%m%d%H%M%S"))
+            return time.mktime(time.strptime("".join(stamp.groups()), "%Y%m%d%H%M%S"))
         except ValueError:
             pass
     return Path(path).stat().st_mtime
@@ -92,41 +92,44 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     shown: set[str] = set()  # Pokémon whose own detail page was captured: you own one
     caught_votes: Counter = Counter()  # frames showing the species as caught (colour sprite, storage...)
     never_votes: Counter = Counter()  # frames showing it as never caught (silhouette, "Seen" list)
-    for r, when in zip(results, times):
-        if r.rare_candy is not None:
-            rare[when][r.rare_candy] += 1
-        for fam, n in r.candy.items():
-            candy_votes[fam][when][n] += 1
+    for result, when in zip(results, times):
+        if result.rare_candy is not None:
+            rare[when][result.rare_candy] += 1
+        for family, count in result.candy.items():
+            candy_votes[family][when][count] += 1
         frame_no_cp: Counter[str] = Counter()
-        for sp, cp in r.specimens:
-            if cp is None:
-                frame_no_cp[sp] += 1
+        for species_id, combat_power in result.specimens:
+            if combat_power is None:
+                frame_no_cp[species_id] += 1
             else:
-                with_cp.add((sp, cp))
-        for sp, n in frame_no_cp.items():  # can't de-duplicate across frames without CP
-            no_cp[sp] = max(no_cp[sp], n)
-        if r.kind == "detail" and r.species:
-            shown.add(r.species)
-        caught_votes.update(r.dex_caught)
-        seen |= r.dex_seen_only
-        never_votes.update(r.dex_not_caught)
-        report.warnings.extend(r.notes)
+                with_cp.add((species_id, combat_power))
+        for species_id, count in frame_no_cp.items():  # can't de-duplicate across frames without CP
+            no_cp[species_id] = max(no_cp[species_id], count)
+        if result.kind == "detail" and result.species:
+            shown.add(result.species)
+        caught_votes.update(result.dex_caught)
+        seen |= result.dex_seen_only
+        never_votes.update(result.dex_not_caught)
+        report.warnings.extend(result.notes)
 
     rare_candy = _pick("Rare Candy", rare, report) if rare else 0
-    candy = {fam: _pick(f"{fam} candy", votes, report) for fam, votes in candy_votes.items()}
+    candy = {family: _pick(f"{family} candy", votes, report) for family, votes in candy_votes.items()}
 
     # majority vote per species: a single misread frame (a sprite still loading, a green Pokémon on a
     # green button) no longer decides on its own
-    caught = {sp for sp in caught_votes if caught_votes[sp] > never_votes[sp]}
-    not_caught = {sp for sp in never_votes if never_votes[sp] > caught_votes[sp]}
-    for sp in sorted(set(caught_votes) & set(never_votes) - caught - not_caught):
-        report.warnings.append(f"{sp}: as many frames show it caught as never caught; left out of both lists")
+    caught = {species_id for species_id in caught_votes if caught_votes[species_id] > never_votes[species_id]}
+    not_caught = {species_id for species_id in never_votes if never_votes[species_id] > caught_votes[species_id]}
+    for species_id in sorted(set(caught_votes) & set(never_votes) - caught - not_caught):
+        report.warnings.append(f"{species_id}: as many frames show it caught as never caught; left out of both lists")
 
-    pokemon = [{"species": sp, "cp": cp, "label": f"CP {cp}"} for sp, cp in sorted(with_cp)]
-    covered = Counter(sp for sp, _ in with_cp)
-    for sp, n in sorted(no_cp.items()):
-        pokemon += [{"species": sp, "cp": None, "label": "CP ?"}] * max(0, n - covered[sp])
-    found = Counter(r.listed for r in results if r.listed)
+    pokemon = [
+        {"species": species_id, "cp": combat_power, "label": f"CP {combat_power}"}
+        for species_id, combat_power in sorted(with_cp)
+    ]
+    covered = Counter(species_id for species_id, _ in with_cp)
+    for species_id, count in sorted(no_cp.items()):
+        pokemon += [{"species": species_id, "cp": None, "label": "CP ?"}] * max(0, count - covered[species_id])
+    found = Counter(result.listed for result in results if result.listed)
     report.listed = found.most_common(1)[0][0] if found else None
     report.grid = len(pokemon)
     if report.listed and report.grid < report.listed:
@@ -136,8 +139,8 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
             "the bottom row's names), or record the scroll instead"
         )
     # a detail page proves you own that Pokémon, even when the storage grid wasn't captured
-    listed = {p["species"] for p in pokemon}
-    pokemon += [{"species": sp, "cp": None, "label": "detail page"} for sp in sorted(shown - listed)]
+    listed = {entry["species"] for entry in pokemon}
+    pokemon += [{"species": species_id, "cp": None, "label": "detail page"} for species_id in sorted(shown - listed)]
 
     return {
         "rare_candy": rare_candy,
@@ -182,19 +185,21 @@ def scan(
 
         results = llm.read_screens(frames, matcher, species, llm.make_model(backend, llm_model), progress=progress)
     else:
-        read = read_text or (lambda _label, img: read_words(img, backend=backend))
+        read = read_text or (lambda _label, image: read_words(image, backend=backend))
         results = []
-        for i, (label, img) in enumerate(frames):
-            res = parse(read(label, img), img, matcher, species)
-            results.append(res)
+        for index, (label, image) in enumerate(frames):
+            result = parse(read(label, image), image, matcher, species)
+            results.append(result)
             if progress:
-                progress(i + 1, len(frames), label, res.kind)
+                progress(index + 1, len(frames), label, result.kind)
     report.frames_read = len(results)
-    report.screens.update(res.kind for res in results)
-    taken = {Path(p).name: taken_at(p) for p in paths}
-    inv = merge(results, report, [taken.get(label, taken.get(label.rsplit("#", 1)[0], 0.0)) for label, _ in frames])
+    report.screens.update(result.kind for result in results)
+    taken = {Path(path).name: taken_at(path) for path in paths}
+    inventory = merge(
+        results, report, [taken.get(label, taken.get(label.rsplit("#", 1)[0], 0.0)) for label, _ in frames]
+    )
 
-    misread = sorted({p["species"] for p in inv["pokemon"]} & set(inv["not_caught"]))
+    misread = sorted({entry["species"] for entry in inventory["pokemon"]} & set(inventory["not_caught"]))
     if misread:
         report.warnings.append(
             "storage shows " + ", ".join(misread) + " but an EVOLVE button shows it as never "
@@ -202,10 +207,10 @@ def scan(
         )
     if not report.screens["bag"]:
         report.warnings.append("no item bag screen found: Rare Candy set to 0")
-    missing = families_missing_candy(inventory_from_dict(inv), species)
+    missing = families_missing_candy(inventory_from_dict(inventory), species)
     if missing:
         report.warnings.append(
             "no candy count for: " + ", ".join(missing) + " (these can still evolve into a "
             "species you don't have; open one detail screen per family, or add them by hand)"
         )
-    return inv, report
+    return inventory, report

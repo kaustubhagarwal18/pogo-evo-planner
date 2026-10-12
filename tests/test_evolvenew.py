@@ -40,15 +40,15 @@ def scanned(*pokemon, candy=None, rare=0, pokedex=()):
         "items": {},
         "pokedex": list(pokedex),
         "not_caught": [],
-        "pokemon": [{"species": sp, "cp": None, "label": "detail page"} for sp in pokemon],
+        "pokemon": [{"species": species_id, "cp": None, "label": "detail page"} for species_id in pokemon],
     }
 
 
 class EvolvenewTests(unittest.TestCase):
     def test_listed_evolutions_are_new_and_final_forms_are_mega_only(self):
         """Listed Pokémon's evolutions become never caught; final forms are Mega only."""
-        inv, listing = apply_evolvenew(scanned("DRAGONAIR", "GENGAR", "KIRLIA", pokedex=["GALLADE"]), SPECIES)
-        self.assertEqual(inv["not_caught"], ["DRAGONITE", "GARDEVOIR"])
+        inventory, listing = apply_evolvenew(scanned("DRAGONAIR", "GENGAR", "KIRLIA", pokedex=["GALLADE"]), SPECIES)
+        self.assertEqual(inventory["not_caught"], ["DRAGONITE", "GARDEVOIR"])
         self.assertEqual(listing.mega_only, ["GENGAR"])  # no candy evolution: listed for its Mega
         self.assertEqual(listing.already_caught, ["GALLADE"])  # its sprite showed it caught
         self.assertIn("Kirlia: only Gardevoir", listing.notes[0])
@@ -56,9 +56,9 @@ class EvolvenewTests(unittest.TestCase):
     def test_only_new_entries_are_planned(self):
         """With new_entries_only, a species caught before but not owned now isn't planned."""
         # Dragonite was caught before but isn't owned now: a normal plan would get it back, evolvenew doesn't
-        inv = Inventory(0, {"DRATINI": 200}, {}, {"DRAGONITE"}, [Specimen("DRAGONAIR")])
-        self.assertEqual(len(plan(SPECIES, TIERS, inv).families), 1)
-        self.assertEqual(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)).families, [])
+        inventory = Inventory(0, {"DRATINI": 200}, {}, {"DRAGONITE"}, [Specimen("DRAGONAIR")])
+        self.assertEqual(len(plan(SPECIES, TIERS, inventory).families), 1)
+        self.assertEqual(plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True)).families, [])
 
     def test_render_groups_the_plan_in_plain_words(self):
         """The text output groups the plan: missing, evolve now, Rare Candy, not yet, Mega only."""
@@ -73,8 +73,8 @@ class EvolvenewTests(unittest.TestCase):
             ),
             SPECIES,
         )
-        inv = inventory_from_dict(data)
-        text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
+        inventory = inventory_from_dict(data)
+        text = render(plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True)), inventory, SPECIES, listing)
         self.assertIn("Rare Candy: 40 of 40 used", text)
         self.assertIn("Evolve now with your own candy:\n  Feebas → Milotic (walk 20 km as buddy first)", text)
         self.assertIn("Use Rare Candy:\n  Dragonair → Dragonite  +40 Rare Candy", text)
@@ -89,8 +89,8 @@ class EvolvenewTests(unittest.TestCase):
     def test_unknown_candy_and_missing_item_say_what_to_do(self):
         """An unknown candy count and a missing item each say what to add."""
         data, listing = apply_evolvenew(scanned("ONIX", "DRATINI"), SPECIES)
-        inv = inventory_from_dict(data)
-        text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
+        inventory = inventory_from_dict(data)
+        text = render(plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True)), inventory, SPECIES, listing)
         self.assertRegex(text, r"  Dragonair\s+from Dratini\s+25 candy, candy \?")
         self.assertRegex(text, r"  Steelix\s+from Onix\s+50 candy, candy \? \(needs Metal Coat\)")
         self.assertIn(
@@ -98,8 +98,8 @@ class EvolvenewTests(unittest.TestCase):
             "--candy NAME=N:\n  Dratini, Onix",
             text,
         )
-        inv.candy["ONIX"] = 100
-        text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
+        inventory.candy["ONIX"] = 100
+        text = render(plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True)), inventory, SPECIES, listing)
         self.assertIn('Onix → Steelix: needs Metal Coat: if you have one, add --item "Metal Coat=N"', text)
 
     def test_missing_list_from_evolvenew_and_the_seen_list(self):
@@ -130,10 +130,10 @@ class EvolvenewTests(unittest.TestCase):
         }
         # the "Seen" list names the plain species, evolvenew its forms: one row, not three
         data, listing = apply_evolvenew({**scanned("TANDEMAUS"), "not_caught": ["MAUSHOLD"]}, species)
-        inv = inventory_from_dict(data)
-        evolve, catch = missing(inv, species)
+        inventory = inventory_from_dict(data)
+        evolve, catch = missing(inventory, species)
         self.assertEqual((len(evolve), catch), (1, []))
-        text = render(plan(species, TIERS, inv, Settings(new_entries_only=True)), inv, species, listing)
+        text = render(plan(species, TIERS, inventory, Settings(new_entries_only=True)), inventory, species, listing)
         self.assertIn("Maushold (Family Of Four or Family Of Three)", text)
 
     def test_one_form_fills_a_pokedex_entry(self):
@@ -152,14 +152,18 @@ class EvolvenewTests(unittest.TestCase):
         data, listing = apply_evolvenew(
             {
                 **scanned(candy={"DUNSPARCE": 173}),
-                "pokemon": [{"species": "DUNSPARCE", "cp": cp, "label": ""} for cp in (500, 600)],
+                "pokemon": [{"species": "DUNSPARCE", "cp": combat_power, "label": ""} for combat_power in (500, 600)],
             },
             species,
         )
-        inv = inventory_from_dict(data)
-        p = plan(species, TIERS, inv, Settings(new_entries_only=True))
-        self.assertEqual(len([path for f in p.families for path in f.paths if path.steps]), 1)  # not both
-        self.assertNotIn("Not yet", render(p, inv, species, listing))  # the other form isn't "missing"
+        inventory = inventory_from_dict(data)
+        evolution_plan = plan(species, TIERS, inventory, Settings(new_entries_only=True))
+        self.assertEqual(
+            len([path for family_plan in evolution_plan.families for path in family_plan.paths if path.steps]), 1
+        )  # not both
+        self.assertNotIn(
+            "Not yet", render(evolution_plan, inventory, species, listing)
+        )  # the other form isn't "missing"
 
     def test_rare_candy_shown_once_per_family(self):
         """A family's Rare Candy is printed once, as a total, not on each of its evolutions."""
@@ -167,12 +171,12 @@ class EvolvenewTests(unittest.TestCase):
             {
                 **scanned(candy={"RALTS": 100}, rare=100),
                 "items": {"ITEM_GEN4_EVOLUTION_STONE": 1},
-                "pokemon": [{"species": "KIRLIA", "cp": cp, "label": ""} for cp in (1, 2)],
+                "pokemon": [{"species": "KIRLIA", "cp": combat_power, "label": ""} for combat_power in (1, 2)],
             },
             SPECIES,
         )
-        inv = inventory_from_dict(data)
-        text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
+        inventory = inventory_from_dict(data)
+        text = render(plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True)), inventory, SPECIES, listing)
         self.assertIn("+100 Rare Candy for the Ralts family", text)
         self.assertEqual(text.count("+100"), 1)  # not repeated on each of the family's lines
 
@@ -180,36 +184,38 @@ class EvolvenewTests(unittest.TestCase):
         """A family with an unknown candy count gets no Rare Candy."""
         # Kubfu's candy wasn't read: counting it as 0 spent 200 Rare Candy on a guess
         data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS", candy={"FEEBAS": 30}, rare=300), SPECIES)
-        inv = inventory_from_dict(data)
-        p = plan(
+        inventory = inventory_from_dict(data)
+        evolution_plan = plan(
             SPECIES,
             TIERS,
-            inv,
-            Settings(new_entries_only=True, rare_candy_blocked_families=unknown_candy(inv, SPECIES)),
+            inventory,
+            Settings(new_entries_only=True, rare_candy_blocked_families=unknown_candy(inventory, SPECIES)),
         )
-        self.assertEqual([f.family for f in p.families], ["FEEBAS"])
+        self.assertEqual([family_plan.family for family_plan in evolution_plan.families], ["FEEBAS"])
 
     def test_the_games_list_beats_owning_a_later_stage(self):
         """In evolvenew mode the never-caught list wins over 'a later stage covers the earlier ones'."""
         # owning Dragonite would normally mean Dragonair was caught; evolvenew listing Dratini says otherwise
         data, _ = apply_evolvenew({**scanned("DRATINI", "DRAGONITE", candy={"DRATINI": 25})}, SPECIES)
-        inv = inventory_from_dict(data)
-        self.assertIn("DRAGONAIR", inv.not_caught)
-        p = plan(SPECIES, TIERS, inv, Settings(new_entries_only=True))
-        self.assertEqual([path.targets for f in p.families for path in f.paths], [["DRAGONAIR"]])
+        inventory = inventory_from_dict(data)
+        self.assertIn("DRAGONAIR", inventory.not_caught)
+        evolution_plan = plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True))
+        self.assertEqual(
+            [path.targets for family_plan in evolution_plan.families for path in family_plan.paths], [["DRAGONAIR"]]
+        )
 
     def test_one_copy_of_a_branching_pokemon_takes_one_branch(self):
         """One copy of a branching Pokémon takes one branch; the output says to add another copy."""
         data, listing = apply_evolvenew(scanned("KIRLIA", candy={"RALTS": 400}), SPECIES)
         data["items"] = {"ITEM_GEN4_EVOLUTION_STONE": 1}
-        inv = inventory_from_dict(data)
-        text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
+        inventory = inventory_from_dict(data)
+        text = render(plan(SPECIES, TIERS, inventory, Settings(new_entries_only=True)), inventory, SPECIES, listing)
         self.assertIn("your 1 Kirlia is planned above; if you have another, add a screenshot of its page", text)
 
     def test_asks_for_each_missing_candy_count(self):
         """Candy questions take a number, a screenshot or Enter, and skip families already read."""
         data, _ = apply_evolvenew(scanned("DRAGONAIR", "FEEBAS", "LARVITAR", "BELDUM"), SPECIES)
-        inv = inventory_from_dict(data)
+        inventory = inventory_from_dict(data)
         replies = iter(
             [
                 "60",  # Dratini: typed
@@ -230,7 +236,7 @@ class EvolvenewTests(unittest.TestCase):
             read.append(paths)
             return {"FEEBAS": 30, "BELDUM": 40}
 
-        answers = ask_for_candy(inv, SPECIES, ask=ask, read=reader, say=said.append)
+        answers = ask_for_candy(inventory, SPECIES, ask=ask, read=reader, say=said.append)
         self.assertEqual(answers, {"DRATINI": 60, "FEEBAS": 30, "BELDUM": 40})
         self.assertEqual(read, [["shots/feebas.png"]])
         self.assertEqual(len(asked), 3)
@@ -256,15 +262,19 @@ class EvolvenewTests(unittest.TestCase):
         """Item questions come once per needed item, retry non-numbers and skip known items."""
         # Kirlia -> Gallade needs a Sinnoh Stone, Onix -> Steelix a Metal Coat
         data, _ = apply_evolvenew(scanned("KIRLIA", "ONIX", candy={"RALTS": 100, "ONIX": 50}), SPECIES)
-        inv = inventory_from_dict(data)
+        inventory = inventory_from_dict(data)
         replies = iter(["two", "2", ""])
         asked, said = [], []
-        answers = ask_for_items(inv, SPECIES, ask=lambda q: asked.append(q) or next(replies), say=said.append)
+        answers = ask_for_items(
+            inventory, SPECIES, ask=lambda question: asked.append(question) or next(replies), say=said.append
+        )
         self.assertEqual(answers, {"ITEM_GEN4_EVOLUTION_STONE": 2, "ITEM_METAL_COAT": 0})
         self.assertEqual(asked[0], "Sinnoh Stone (Kirlia → Gallade): how many? ")
         self.assertIn("type a number", said[1])  # "two" was asked again
-        inv.items.update(answers)
-        self.assertEqual(ask_for_items(inv, SPECIES, ask=lambda q: "", say=said.append), {})  # all known now
+        inventory.items.update(answers)
+        self.assertEqual(
+            ask_for_items(inventory, SPECIES, ask=lambda question: "", say=said.append), {}
+        )  # all known now
 
     def test_end_of_input_stops_asking(self):
         """End of input (Ctrl-D) stops the questions and keeps the answers already given."""
@@ -310,17 +320,19 @@ class EvolvenewTests(unittest.TestCase):
             Word("DRATINI", 250, 1300, 160, 34, 0.9),
             Word("CANDY", 420, 1300, 120, 34, 0.9),
         ]
-        r = parse_detail(words, SpeciesMatcher(SPECIES), SPECIES)
-        self.assertEqual((r.species, r.specimens, r.candy), ("DRATINI", [("DRATINI", 291)], {"DRATINI": 60}))
+        result = parse_detail(words, SpeciesMatcher(SPECIES), SPECIES)
+        self.assertEqual(
+            (result.species, result.specimens, result.candy), ("DRATINI", [("DRATINI", 291)], {"DRATINI": 60})
+        )
         frames = [
-            r,
-            r,
+            result,
+            result,
             ScreenResult("detail", species="DRATINI", specimens=[("DRATINI", 412)]),
             ScreenResult("detail", species="GENGAR"),
         ]  # scrolled down: no CP on screen
-        inv = merge(frames, ScanReport())
+        inventory = merge(frames, ScanReport())
         self.assertEqual(
-            sorted((p["species"], p["cp"]) for p in inv["pokemon"]),
+            sorted((entry["species"], entry["cp"]) for entry in inventory["pokemon"]),
             [("DRATINI", 291), ("DRATINI", 412), ("GENGAR", None)],
         )
 
@@ -330,11 +342,11 @@ class EvolvenewTests(unittest.TestCase):
         report = ScanReport()
         report.screens["detail"] = 2
         with (
-            tempfile.TemporaryDirectory() as d,
+            tempfile.TemporaryDirectory() as folder,
             mock.patch("pogo_evo_planner.scan.pipeline.scan", return_value=(read, report)),
         ):
-            out = Path(d) / "evolvenew.json"
-            args = ["evolvenew", "a.png", "--species", str(SAMPLE), "-o", str(out), "-q"]
+            saved = Path(folder) / "evolvenew.json"
+            args = ["evolvenew", "a.png", "--species", str(SAMPLE), "-o", str(saved), "-q"]
             stdout, stderr = io.StringIO(), io.StringIO()
             with (
                 contextlib.redirect_stdout(stdout),
@@ -347,7 +359,7 @@ class EvolvenewTests(unittest.TestCase):
                 cli.main(args + ["--rare-candy", "50", "--candy", "Dragonair=70"])
             self.assertIn("Dragonair → Dragonite  +30 Rare Candy", stdout.getvalue())
             self.assertIn("Gengar", stdout.getvalue())
-            self.assertEqual(json.loads(out.read_text())["candy"], {"DRATINI": 70})  # typed count wins
+            self.assertEqual(json.loads(saved.read_text())["candy"], {"DRATINI": 70})  # typed count wins
 
             # in a terminal, it asks for the missing count and plans with the answer
             stdout = io.StringIO()
@@ -363,7 +375,7 @@ class EvolvenewTests(unittest.TestCase):
             text = stdout.getvalue()
             self.assertIn("Dragonair → Dragonite  +20 Rare Candy", text)
             self.assertIn("To skip the questions next time: --candy DRATINI=80", text)
-            self.assertEqual(json.loads(out.read_text())["candy"], {"DRATINI": 80})
+            self.assertEqual(json.loads(saved.read_text())["candy"], {"DRATINI": 80})
 
 
 if __name__ == "__main__":

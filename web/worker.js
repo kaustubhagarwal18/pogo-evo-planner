@@ -22,27 +22,27 @@ let imaging = false;  // NumPy and OpenCV are loaded
 
 /** Fetch a file next to this script, failing on an HTTP error rather than handing back an error page. */
 async function fetchOk(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`couldn't fetch ${url} (HTTP ${r.status})`);
-  return r;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`couldn't fetch ${url} (HTTP ${response.status})`);
+  return response;
 }
 
 /** The last line of a Python traceback: the error itself. */
-function lastLine(err) {
-  const lines = String((err && err.message) || err).trim().split("\n");
+function lastLine(error) {
+  const lines = String((error && error.message) || error).trim().split("\n");
   return lines[lines.length - 1];
 }
 
 /** Load Python, unpack the planner package next to it, and return what the editor needs. */
 async function start({ build }) {
   postMessage({ type: "progress", text: "Downloading Python…" });
-  const [py, zip, species] = await Promise.all([
+  const [loadedPyodide, zip, species] = await Promise.all([
     loadPyodide({ indexURL: PYODIDE }),
-    fetchOk("planner.zip?v=" + build).then((r) => r.arrayBuffer()),
-    fetchOk("species.json?v=" + build).then((r) => r.text()),
+    fetchOk("planner.zip?v=" + build).then((response) => response.arrayBuffer()),
+    fetchOk("species.json?v=" + build).then((response) => response.text()),
   ]);
   postMessage({ type: "progress", text: "Starting the planner…" });
-  pyodide = py;
+  pyodide = loadedPyodide;
   pyodide.unpackArchive(zip, "zip", { extractDir: "/planner" });
   pyodide.runPython("import sys; sys.path.insert(0, '/planner')");
   planner = pyodide.pyimport("pogo_evo_planner.webapp").WebPlanner(species);
@@ -55,8 +55,8 @@ function planRequest({ request }) {
   let reply;
   try {
     reply = JSON.parse(planner.plan_json(JSON.stringify(request)));
-  } catch (err) {
-    reply = { error: "The planner hit an error: " + lastLine(err) };
+  } catch (error) {
+    reply = { error: "The planner hit an error: " + lastLine(error) };
   }
   return { ms: performance.now() - t0, reply };
 }
@@ -79,8 +79,8 @@ function scanAdd({ name, modified, data }) {
   pyodide.FS.utime(path, modified, modified);
   const passes = JSON.parse(scanner.passes_json(name));
   if (passes.error) return { result: passes };
-  const result = passes.map((p) => ({ png: pyodide.FS.readFile(p.path), scale: p.scale }));
-  return { result, transfer: result.map((p) => p.png.buffer) };
+  const result = passes.map((imagePass) => ({ png: pyodide.FS.readFile(imagePass.path), scale: imagePass.scale }));
+  return { result, transfer: result.map((imagePass) => imagePass.png.buffer) };
 }
 
 const CALLS = {
@@ -94,15 +94,15 @@ const CALLS = {
 
 let queue = Promise.resolve();   // one call at a time, in the order they came
 
-onmessage = (e) => {
-  const { id, type, ...args } = e.data;
+onmessage = (event) => {
+  const { id, type, ...args } = event.data;
   queue = queue.then(async () => {
     try {
       const out = await CALLS[type](args);
       const wrapped = type === "scan-add" ? out : { result: out };
       postMessage({ id, result: wrapped.result }, wrapped.transfer || []);
-    } catch (err) {
-      postMessage({ id, error: lastLine(err) });
+    } catch (error) {
+      postMessage({ id, error: lastLine(error) });
     }
   });
 };

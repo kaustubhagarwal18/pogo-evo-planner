@@ -16,23 +16,25 @@ class DashboardTest(unittest.TestCase):
     def test_view_has_sprites_and_new_dex_flags(self):
         """The view gives dex numbers for sprites and flags steps that add a Pokédex entry."""
         # Dragonair is registered; Dragonite is not, so only the final step adds a Pokédex entry
-        inv = Inventory(150, {"DRATINI": 0}, {}, {"DRAGONAIR"}, [Specimen("DRATINI")])
-        view = build_view(plan(SPECIES, TIERS, inv), inv, SPECIES)
+        inventory = Inventory(150, {"DRATINI": 0}, {}, {"DRAGONAIR"}, [Specimen("DRATINI")])
+        view = build_view(plan(SPECIES, TIERS, inventory), inventory, SPECIES)
         steps = view["families"][0]["paths"][0]["steps"]
-        self.assertEqual([(s["to"], s["new_dex"]) for s in steps], [("DRAGONAIR", False), ("DRAGONITE", True)])
+        self.assertEqual([(step["to"], step["new_dex"]) for step in steps], [("DRAGONAIR", False), ("DRAGONITE", True)])
         self.assertEqual(view["dex"], {"DRATINI": 147, "DRAGONAIR": 148, "DRAGONITE": 149})
 
     def test_render_embeds_view_safely(self):
         """The view is embedded in the page, and a label like </script> can't end the script early."""
-        inv = Inventory(0, {}, {}, set(), [Specimen("DRATINI", label="</script>")])
-        page = render_html(build_view(plan(SPECIES, TIERS, inv), inv, SPECIES))
+        inventory = Inventory(0, {}, {}, set(), [Specimen("DRATINI", label="</script>")])
+        page = render_html(build_view(plan(SPECIES, TIERS, inventory), inventory, SPECIES))
         self.assertNotIn("/*DATA*/null", page)
         self.assertNotIn('"</script>"', page)
 
     def test_lists_items_no_evolution_uses(self):
         """Items no evolution needs are named on the page, so a misspelt item isn't silently ignored."""
-        inv = Inventory(0, {}, {"Sinoh Stone": 1}, set(), [])
-        self.assertEqual(build_view(plan(SPECIES, TIERS, inv), inv, SPECIES)["unknown_items"], ["Sinoh Stone"])
+        inventory = Inventory(0, {}, {"Sinoh Stone": 1}, set(), [])
+        self.assertEqual(
+            build_view(plan(SPECIES, TIERS, inventory), inventory, SPECIES)["unknown_items"], ["Sinoh Stone"]
+        )
 
 
 if __name__ == "__main__":

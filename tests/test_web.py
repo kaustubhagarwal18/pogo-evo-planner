@@ -40,9 +40,9 @@ def ask(planner: WebPlanner, inventory: dict, **options) -> dict:
 def tsv(words: list[Word], scale: float = 1.0) -> str:
     """Words as tesseract.js writes them: TSV rows with no header, boxes in the pixels of the image it read."""
     return "".join(
-        f"5\t1\t1\t1\t1\t{i}\t{round(w.x * scale)}\t{round(w.y * scale)}\t{round(w.w * scale)}\t"
-        f"{round(w.h * scale)}\t{w.conf * 100:.0f}\t{w.text}\n"
-        for i, w in enumerate(words)
+        f"5\t1\t1\t1\t1\t{index}\t{round(word.x * scale)}\t{round(word.y * scale)}\t{round(word.w * scale)}\t"
+        f"{round(word.h * scale)}\t{word.conf * 100:.0f}\t{word.text}\n"
+        for index, word in enumerate(words)
     )
 
 
@@ -56,11 +56,11 @@ DRAGONAIR = [
 ]
 
 
-def build(out: Path) -> str:
-    """Build the site from the sample species into out; return what the script printed."""
+def build(folder: Path) -> str:
+    """Build the site from the sample species into folder; return what the script printed."""
     printed = io.StringIO()
     with contextlib.redirect_stdout(printed):
-        BUILD["main"](["--species", str(SAMPLE), "-o", str(out)])
+        BUILD["main"](["--species", str(SAMPLE), "-o", str(folder)])
     return printed.getvalue()
 
 
@@ -133,11 +133,11 @@ class WebPlannerTests(unittest.TestCase):
     def test_items_asked_only_for_evolutions_the_plan_counts(self):
         """With new entries only (evolvenew), an item for a species already registered isn't asked for; otherwise it is,
         since evolving into a species you don't hold still counts."""
-        inv = {"candy": {"RALTS": 300}, "pokedex": ["GALLADE"], "pokemon": [{"species": "KIRLIA"}]}
+        inventory = {"candy": {"RALTS": 300}, "pokedex": ["GALLADE"], "pokemon": [{"species": "KIRLIA"}]}
         self.assertEqual(
-            ask(self.planner, inv)["missing_items"], {"ITEM_GEN4_EVOLUTION_STONE": [["KIRLIA", "GALLADE"]]}
+            ask(self.planner, inventory)["missing_items"], {"ITEM_GEN4_EVOLUTION_STONE": [["KIRLIA", "GALLADE"]]}
         )
-        self.assertEqual(ask(self.planner, inv, new_entries_only=True)["missing_items"], {})
+        self.assertEqual(ask(self.planner, inventory, new_entries_only=True)["missing_items"], {})
 
     def test_catalog_has_families_and_item_names(self):
         """The editor gets each species' family and dex number, and items by the names players use."""
@@ -152,15 +152,21 @@ class WebScanTests(unittest.TestCase):
     def scan_shots(self, shots: dict[str, tuple], evolvenew: bool = False) -> dict:
         """Read screenshots {name: (image, words)} through WebScan as the page does, with each pass's TSV made from
         the words; return finish_json's reply."""
-        with tempfile.TemporaryDirectory() as tmp:
-            scanner = self.planner.scanner(str(Path(tmp) / "scan"))
+        with tempfile.TemporaryDirectory() as folder:
+            scanner = self.planner.scanner(str(Path(folder) / "scan"))
             for name, (image, words) in shots.items():
                 cv2.imwrite(str(scanner.folder / name), image)
                 passes = json.loads(scanner.passes_json(name))
-                self.assertEqual([Path(p["path"]).is_file() for p in passes], [True] * 3)
+                self.assertEqual([Path(read_pass["path"]).is_file() for read_pass in passes], [True] * 3)
                 kind = json.loads(
                     scanner.read_json(
-                        name, json.dumps([{"tsv": tsv(words, p["scale"]), "scale": p["scale"]} for p in passes])
+                        name,
+                        json.dumps(
+                            [
+                                {"tsv": tsv(words, read_pass["scale"]), "scale": read_pass["scale"]}
+                                for read_pass in passes
+                            ]
+                        ),
                     )
                 )["kind"]
                 self.assertIn(kind, ("bag", "detail"))
@@ -173,11 +179,11 @@ class WebScanTests(unittest.TestCase):
         """A bag and a Pokémon page read as `scan` reads them: Rare Candy, the family's candy and the Pokémon."""
         blank = np.full((2400, 1080, 3), 250, np.uint8)
         reply = self.scan_shots({"bag.png": (mockscreens.bag_screen(), BAG), "dragonair.png": (blank, DRAGONAIR)})
-        inv = reply["inventory"]
-        self.assertEqual((inv["rare_candy"], inv["candy"]), (150, {"DRATINI": 60}))
-        self.assertEqual([p["species"] for p in inv["pokemon"]], ["DRAGONAIR"])
+        inventory = reply["inventory"]
+        self.assertEqual((inventory["rare_candy"], inventory["candy"]), (150, {"DRATINI": 60}))
+        self.assertEqual([entry["species"] for entry in inventory["pokemon"]], ["DRAGONAIR"])
         self.assertEqual((reply["screens"], reply["bag"]), ({"bag": 1, "detail": 1}, True))
-        self.assertNotIn("DRAGONITE", inv["not_caught"])
+        self.assertNotIn("DRAGONITE", inventory["not_caught"])
 
     def test_evolvenew_marks_the_listed_evolutions_never_caught(self):
         """In the evolvenew way, a listed Pokémon's evolution is never caught, and the page asks for Rare Candy
@@ -186,13 +192,13 @@ class WebScanTests(unittest.TestCase):
         reply = self.scan_shots({"dragonair.png": (blank, DRAGONAIR)}, evolvenew=True)
         self.assertEqual(reply["inventory"]["not_caught"], ["DRAGONITE"])
         self.assertFalse(reply["bag"])
-        self.assertFalse([w for w in reply["warnings"] if "bag" in w or "candy count" in w])
+        self.assertFalse([warning for warning in reply["warnings"] if "bag" in warning or "candy count" in warning])
         self.assertEqual(reply["mega_only"], [])
 
     def test_a_file_that_isnt_an_image_is_named(self):
         """A file that isn't a PNG or JPEG gets one line naming it, not a crash."""
-        with tempfile.TemporaryDirectory() as tmp:
-            scanner = self.planner.scanner(str(Path(tmp) / "scan"))
+        with tempfile.TemporaryDirectory() as folder:
+            scanner = self.planner.scanner(str(Path(folder) / "scan"))
             (scanner.folder / "notes.png").write_text("not a picture", encoding="utf-8")
             self.assertEqual(
                 json.loads(scanner.passes_json("notes.png")), {"error": "notes.png isn't a PNG or JPEG screenshot"}
@@ -202,47 +208,51 @@ class WebScanTests(unittest.TestCase):
 class SiteBuildTests(unittest.TestCase):
     def test_site_has_the_page_package_and_species(self):
         """The site holds the page stamped with a build id, the package without caches, and the species table."""
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "site"
-            self.assertIn("65 species", build(out))
-            page = (out / "index.html").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as folder:
+            site = Path(folder) / "site"
+            self.assertIn("65 species", build(site))
+            page = (site / "index.html").read_text(encoding="utf-8")
             self.assertNotIn("{{BUILD}}", page)
             self.assertRegex(page, r'app\.js\?v=[0-9a-f]{12}"')
-            self.assertEqual(json.loads((out / "species.json").read_text(encoding="utf-8")), SPECIES)
-            with zipfile.ZipFile(out / "planner.zip") as z:
-                names = z.namelist()
+            self.assertEqual(json.loads((site / "species.json").read_text(encoding="utf-8")), SPECIES)
+            with zipfile.ZipFile(site / "planner.zip") as archive:
+                names = archive.namelist()
             self.assertIn("pogo_evo_planner/webapp.py", names)
             self.assertIn("pogo_evo_planner/data/dashboard.html", names)
-            self.assertFalse([n for n in names if "__pycache__" in n or n.endswith(".pyc")])
-            for f in ("app.js", "worker.js", "style.css", "inventory_sample.json"):
-                self.assertTrue((out / f).is_file(), f)
+            self.assertFalse([name for name in names if "__pycache__" in name or name.endswith(".pyc")])
+            for file_name in ("app.js", "worker.js", "style.css", "inventory_sample.json"):
+                self.assertTrue((site / file_name).is_file(), file_name)
 
     def test_same_files_give_the_same_build(self):
         """Building twice gives the same files, so browsers only fetch again when something changed."""
-        with tempfile.TemporaryDirectory() as tmp:
-            build(Path(tmp) / "a")
-            build(Path(tmp) / "b")
-            for f in ("index.html", "planner.zip"):
-                self.assertEqual((Path(tmp) / "a" / f).read_bytes(), (Path(tmp) / "b" / f).read_bytes(), f)
+        with tempfile.TemporaryDirectory() as folder:
+            build(Path(folder) / "a")
+            build(Path(folder) / "b")
+            for file_name in ("index.html", "planner.zip"):
+                self.assertEqual(
+                    (Path(folder) / "a" / file_name).read_bytes(),
+                    (Path(folder) / "b" / file_name).read_bytes(),
+                    file_name,
+                )
 
     def test_package_plans_with_the_standard_library_only(self):
         """The zipped package plans the example in a Python with no installed packages, as it must in Pyodide."""
-        with tempfile.TemporaryDirectory() as tmp:
-            build(Path(tmp) / "site")
-            with zipfile.ZipFile(Path(tmp) / "site" / "planner.zip") as z:
-                z.extractall(Path(tmp) / "py")
+        with tempfile.TemporaryDirectory() as folder:
+            build(Path(folder) / "site")
+            with zipfile.ZipFile(Path(folder) / "site" / "planner.zip") as archive:
+                archive.extractall(Path(folder) / "py")
             code = (
                 "import json, sys\n"
                 "sys.path.insert(0, '.')\n"
                 "from pogo_evo_planner.webapp import WebPlanner\n"
-                f"w = WebPlanner(open({str(Path(tmp) / 'site' / 'species.json')!r}).read())\n"
+                f"w = WebPlanner(open({str(Path(folder) / 'site' / 'species.json')!r}).read())\n"
                 f"print(json.loads(w.plan_json(json.dumps({{'inventory': {EXAMPLE!r}}})))['rare_candy_used'])\n"
                 "print(sorted(m for m in sys.modules if m.split('.')[0] in ('cv2', 'numpy', 'rapidocr')))\n"
             )
             # -S: no site-packages, so an import of anything outside the standard library fails here
             done = subprocess.run(
                 [sys.executable, "-S", "-c", code],
-                cwd=Path(tmp) / "py",  # nosec B603
+                cwd=Path(folder) / "py",  # nosec B603
                 capture_output=True,
                 text=True,
                 check=False,
@@ -254,12 +264,12 @@ class SiteBuildTests(unittest.TestCase):
 
     def test_refuses_to_replace_a_folder_it_didnt_build(self):
         """An output folder holding anything other than an earlier build is left alone, with one line saying why."""
-        with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "notes.txt").write_text("mine", encoding="utf-8")
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / "notes.txt").write_text("mine", encoding="utf-8")
             with self.assertRaises(SystemExit) as stop:
-                build(Path(tmp))
+                build(Path(folder))
             self.assertTrue(re.match(r"error: .* isn't a site this script built", str(stop.exception.code)))
-            self.assertEqual((Path(tmp) / "notes.txt").read_text(encoding="utf-8"), "mine")
+            self.assertEqual((Path(folder) / "notes.txt").read_text(encoding="utf-8"), "mine")
 
 
 if __name__ == "__main__":

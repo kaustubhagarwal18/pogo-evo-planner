@@ -20,32 +20,38 @@ SAMPLE = str(ROOT / "pogo_evo_planner/data/species_sample.json")
 
 def run(*argv: str) -> tuple[str, str]:
     """Run the command line; return its exit message ("" when it didn't exit) and what it printed."""
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+    printed = io.StringIO()
+    with contextlib.redirect_stdout(printed), contextlib.redirect_stderr(io.StringIO()):
         try:
             cli.main(list(argv))
-        except SystemExit as e:
-            return str(e.code), out.getvalue()
-    return "", out.getvalue()
+        except SystemExit as stop:
+            return str(stop.code), printed.getvalue()
+    return "", printed.getvalue()
 
 
 class CliTests(unittest.TestCase):
     def test_missing_or_broken_files_give_one_line(self):
         """A missing or broken inventory or species file exits with one line naming it, not a traceback."""
-        with tempfile.TemporaryDirectory() as d:
+        with tempfile.TemporaryDirectory() as folder:
             files = {
                 "bad.json": '{"rare_candy": 1,',
                 "list.json": "[1, 2]",
                 "no_species.json": '{"pokemon": [{"cp": 10}]}',
             }
             for name, text in files.items():
-                (Path(d) / name).write_text(text)
+                (Path(folder) / name).write_text(text)
             cases = [
                 (["plan", "nothere.json"], "can't read the inventory nothere.json: No such file or directory"),
-                (["dashboard", "nothere.json", "-o", str(Path(d) / "x.html")], "can't read the inventory nothere.json"),
-                (["plan", str(Path(d) / "bad.json")], "bad.json isn't a valid inventory file: Expecting property name"),
-                (["plan", str(Path(d) / "list.json")], "list.json isn't a valid inventory file"),
-                (["plan", str(Path(d) / "no_species.json")], "an entry has no 'species' field"),
+                (
+                    ["dashboard", "nothere.json", "-o", str(Path(folder) / "x.html")],
+                    "can't read the inventory nothere.json",
+                ),
+                (
+                    ["plan", str(Path(folder) / "bad.json")],
+                    "bad.json isn't a valid inventory file: Expecting property name",
+                ),
+                (["plan", str(Path(folder) / "list.json")], "list.json isn't a valid inventory file"),
+                (["plan", str(Path(folder) / "no_species.json")], "an entry has no 'species' field"),
             ]
             for argv, expected in cases:
                 with self.subTest(argv=argv[:2]):
@@ -79,13 +85,13 @@ class CliTests(unittest.TestCase):
     def test_no_ocr_engine(self):
         """With no OCR engine installed, the scan says how to install one instead of showing a traceback."""
         with (
-            tempfile.TemporaryDirectory() as d,
+            tempfile.TemporaryDirectory() as folder,
             mock.patch("pogo_evo_planner.scan.ocr.rapidocr_available", return_value=False),
             mock.patch("pogo_evo_planner.scan.ocr.tesseract_available", return_value=False),
         ):
-            shot = Path(d) / "shot.png"
+            shot = Path(folder) / "shot.png"
             cv2.imwrite(str(shot), np.full((40, 40, 3), 255, np.uint8))
-            message, _ = run("scan", str(shot), "--species", SAMPLE, "-q", "-o", str(Path(d) / "inv.json"))
+            message, _ = run("scan", str(shot), "--species", SAMPLE, "-q", "-o", str(Path(folder) / "inv.json"))
         self.assertTrue(message.startswith("error: no OCR engine found"), message)
         self.assertIn("pip install -e '.[ocr]'", message)
 
@@ -107,16 +113,16 @@ class CliTests(unittest.TestCase):
             )
         self.assertEqual(message, "error: stop")
         self.assertEqual(
-            {k: scan.call_args.kwargs[k] for k in ("backend", "max_llm_frames", "llm_model")},
+            {option: scan.call_args.kwargs[option] for option in ("backend", "max_llm_frames", "llm_model")},
             {"backend": "claude", "max_llm_frames": 100, "llm_model": "a-model"},
         )
 
     def test_plan_names_families_without_a_candy_count(self):
         """The text plan says which families got no Rare Candy because their candy count is unknown."""
-        with tempfile.TemporaryDirectory() as d:
-            inv = Path(d) / "inv.json"
-            inv.write_text(json.dumps({"rare_candy": 200, "candy": {}, "pokemon": [{"species": "DRATINI"}]}))
-            message, printed = run("plan", str(inv), "--species", SAMPLE)
+        with tempfile.TemporaryDirectory() as folder:
+            inventory_path = Path(folder) / "inv.json"
+            inventory_path.write_text(json.dumps({"rare_candy": 200, "candy": {}, "pokemon": [{"species": "DRATINI"}]}))
+            message, printed = run("plan", str(inventory_path), "--species", SAMPLE)
         self.assertEqual(message, "")
         self.assertIn("Rare candy: using 0 of 200", printed)
         self.assertIn('No candy count, so no Rare Candy planned for: Dratini (add their counts under "candy")', printed)
@@ -125,19 +131,21 @@ class CliTests(unittest.TestCase):
         """`plan` uses a Sinnoh Stone written as ITEM_SINNOH_STONE (as the docs once showed), names any item no
         evolution uses, and stops with one line when a file lists the same item under two names."""
         kirlia = {"rare_candy": 0, "candy": {"RALTS": 300}, "pokemon": [{"species": "KIRLIA"}, {"species": "KIRLIA"}]}
-        with tempfile.TemporaryDirectory() as d:
-            inv = Path(d) / "inv.json"
-            inv.write_text(json.dumps({**kirlia, "items": {"ITEM_SINNOH_STONE": 1, "Moon Stone": 1}}))
-            message, printed = run("plan", str(inv), "--species", SAMPLE)
+        with tempfile.TemporaryDirectory() as folder:
+            inventory_path = Path(folder) / "inv.json"
+            inventory_path.write_text(json.dumps({**kirlia, "items": {"ITEM_SINNOH_STONE": 1, "Moon Stone": 1}}))
+            message, printed = run("plan", str(inventory_path), "--species", SAMPLE)
             self.assertEqual(message, "")
             self.assertIn("Kirlia -> Gallade", printed)
             self.assertIn("Gallade: needs Sinnoh Stone", printed)  # the name players know, not the game's id
             self.assertIn("No evolution uses these items, so the plan ignores them: Moon Stone", printed)
-            inv.write_text(json.dumps({**kirlia, "items": {"Sinnoh Stone": 1, "ITEM_GEN4_EVOLUTION_STONE": 2}}))
-            message, _ = run("plan", str(inv), "--species", SAMPLE)
+            inventory_path.write_text(
+                json.dumps({**kirlia, "items": {"Sinnoh Stone": 1, "ITEM_GEN4_EVOLUTION_STONE": 2}})
+            )
+            message, _ = run("plan", str(inventory_path), "--species", SAMPLE)
         self.assertEqual(
             message,
-            f'error: {inv} isn\'t a valid inventory file: "items" lists Sinnoh Stone twice, '
+            f'error: {inventory_path} isn\'t a valid inventory file: "items" lists Sinnoh Stone twice, '
             "as Sinnoh Stone and ITEM_GEN4_EVOLUTION_STONE; keep one",
         )
 

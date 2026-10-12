@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-W, H = 1080, 2340
+WIDTH, HEIGHT = 1080, 2340
 _FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/Library/Fonts/Arial Bold.ttf",
@@ -51,34 +51,34 @@ GROUND_TRUTH = {
 
 def _font(size: int):
     """A TrueType font at the given size: the first installed candidate, else Pillow's default."""
-    for p in _FONT_CANDIDATES:
-        if Path(p).exists():
-            return ImageFont.truetype(p, size)
+    for font_path in _FONT_CANDIDATES:
+        if Path(font_path).exists():
+            return ImageFont.truetype(font_path, size)
     return ImageFont.load_default(size)
 
 
-def _canvas(h: int = H, bg=(236, 244, 240)):
+def _canvas(height: int = HEIGHT, background=(236, 244, 240)):
     """A blank phone-sized screen and a drawing context for it."""
-    img = Image.new("RGB", (W, h), bg)
-    return img, ImageDraw.Draw(img)
+    image = Image.new("RGB", (WIDTH, height), background)
+    return image, ImageDraw.Draw(image)
 
 
-def _center(d, x, y, text, size, fill=(40, 60, 70)):
-    """Draw text horizontally centred on x, with its top at y."""
-    f = _font(size)
-    tw = d.textlength(text, font=f)
-    d.text((x - tw / 2, y), text, font=f, fill=fill)
+def _center(draw, center_x, top, text, size, fill=(40, 60, 70)):
+    """Draw text horizontally centred on center_x, with its top edge at top."""
+    font = _font(size)
+    text_width = draw.textlength(text, font=font)
+    draw.text((center_x - text_width / 2, top), text, font=font, fill=fill)
 
 
-def _to_bgr(img: Image.Image) -> np.ndarray:
+def _to_bgr(image: Image.Image) -> np.ndarray:
     """Convert a Pillow RGB image to the BGR array OpenCV uses."""
-    return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
 
 def bag_screen() -> np.ndarray:
     """An item bag screen listing Rare Candy, Rare Candy XL and other items with counts."""
-    img, d = _canvas()
-    _center(d, W / 2, 120, "ITEMS 312/3500", 64)
+    image, draw = _canvas()
+    _center(draw, WIDTH / 2, 120, "ITEMS 312/3500", 64)
     rows = [
         ("Poke Ball", 120),
         ("Great Ball", 85),
@@ -86,85 +86,93 @@ def bag_screen() -> np.ndarray:
         ("Rare Candy XL", 3),
         ("Razz Berry", 44),
     ]
-    for i, (name, n) in enumerate(rows):
-        y = 320 + i * 260
-        d.ellipse((90, y, 250, y + 160), fill=(200, 120, 160))
-        d.text((300, y + 50), name, font=_font(56), fill=(40, 60, 70))
-        d.text((860, y + 50), f"x{n}", font=_font(56), fill=(40, 60, 70))
-    return _to_bgr(img)
+    for index, (name, count) in enumerate(rows):
+        top = 320 + index * 260
+        draw.ellipse((90, top, 250, top + 160), fill=(200, 120, 160))
+        draw.text((300, top + 50), name, font=_font(56), fill=(40, 60, 70))
+        draw.text((860, top + 50), f"x{count}", font=_font(56), fill=(40, 60, 70))
+    return _to_bgr(image)
 
 
 def storage_canvas() -> np.ndarray:
     """A tall storage grid; the recording scrolls through it."""
     rows = (len(GROUND_TRUTH["storage"]) + 2) // 3
-    img, d = _canvas(h=300 + rows * 420)
-    _center(d, W / 2, 80, f"POKEMON {len(GROUND_TRUTH['storage'])}/3000", 64)
-    for i, (sp, cp) in enumerate(GROUND_TRUTH["storage"]):
-        cx, y = 180 + (i % 3) * 360, 260 + (i // 3) * 420
-        _center(d, cx, y, f"CP {cp}", 46)
-        d.ellipse((cx - 90, y + 80, cx + 90, y + 260), fill=(90 + (i * 37) % 150, 160, 200 - (i * 23) % 120))
-        _center(d, cx, y + 290, sp.title(), 46)
-    return _to_bgr(img)
+    image, draw = _canvas(height=300 + rows * 420)
+    _center(draw, WIDTH / 2, 80, f"POKEMON {len(GROUND_TRUTH['storage'])}/3000", 64)
+    for index, (species_id, combat_power) in enumerate(GROUND_TRUTH["storage"]):
+        center_x, top = 180 + (index % 3) * 360, 260 + (index // 3) * 420
+        _center(draw, center_x, top, f"CP {combat_power}", 46)
+        draw.ellipse(
+            (center_x - 90, top + 80, center_x + 90, top + 260),
+            fill=(90 + (index * 37) % 150, 160, 200 - (index * 23) % 120),
+        )
+        _center(draw, center_x, top + 290, species_id.title(), 46)
+    return _to_bgr(image)
 
 
 def pokedex_screen() -> np.ndarray:
     """A Pokédex screen: coloured sprites for caught entries, grey silhouettes for seen-only ones."""
-    img, d = _canvas()
-    _center(d, W / 2, 100, "POKEDEX", 64)
-    entries = sorted([(n, True) for n in GROUND_TRUTH["dex_caught"]] + [(n, False) for n in GROUND_TRUTH["dex_seen"]])
-    for i, (num, caught) in enumerate(entries):
-        cx, y = 160 + (i % 4) * 253, 300 + (i // 4) * 420
+    image, draw = _canvas()
+    _center(draw, WIDTH / 2, 100, "POKEDEX", 64)
+    entries = sorted(
+        [(dex_number, True) for dex_number in GROUND_TRUTH["dex_caught"]]
+        + [(dex_number, False) for dex_number in GROUND_TRUTH["dex_seen"]]
+    )
+    for index, (dex_number, caught) in enumerate(entries):
+        center_x, top = 160 + (index % 4) * 253, 300 + (index // 4) * 420
         colour = (230, 120, 40) if caught else (70, 70, 75)
-        d.ellipse((cx - 85, y, cx + 85, y + 170), fill=colour)
-        _center(d, cx, y + 200, f"#{num:04d}", 44)
-    return _to_bgr(img)
+        draw.ellipse((center_x - 85, top, center_x + 85, top + 170), fill=colour)
+        _center(draw, center_x, top + 200, f"#{dex_number:04d}", 44)
+    return _to_bgr(image)
 
 
 def detail_screen(name: str, family: str) -> np.ndarray:
     """A Pokémon detail page with its CP, name, stardust, family candy and EVOLVE button."""
-    img, d = _canvas(bg=(250, 250, 250))
-    cp = dict(GROUND_TRUTH["storage"])[name]
-    _center(d, W / 2, 140, f"CP {cp}", 80)
-    d.ellipse((W / 2 - 260, 330, W / 2 + 260, 850), fill=(120, 170, 220))
-    _center(d, W / 2, 920, name.title(), 84)
-    _center(d, 300, 1240, "48,210", 60)
-    _center(d, 300, 1320, "STARDUST", 40)
-    _center(d, 780, 1240, str(GROUND_TRUTH["candy"][family]), 60)
-    _center(d, 780, 1320, f"{family} CANDY", 40)
-    _center(d, W / 2, 1560, "POWER UP", 56)
-    _center(d, W / 2, 1760, "EVOLVE", 56)
-    return _to_bgr(img)
+    image, draw = _canvas(background=(250, 250, 250))
+    combat_power = dict(GROUND_TRUTH["storage"])[name]
+    _center(draw, WIDTH / 2, 140, f"CP {combat_power}", 80)
+    draw.ellipse((WIDTH / 2 - 260, 330, WIDTH / 2 + 260, 850), fill=(120, 170, 220))
+    _center(draw, WIDTH / 2, 920, name.title(), 84)
+    _center(draw, 300, 1240, "48,210", 60)
+    _center(draw, 300, 1320, "STARDUST", 40)
+    _center(draw, 780, 1240, str(GROUND_TRUTH["candy"][family]), 60)
+    _center(draw, 780, 1320, f"{family} CANDY", 40)
+    _center(draw, WIDTH / 2, 1560, "POWER UP", 56)
+    _center(draw, WIDTH / 2, 1760, "EVOLVE", 56)
+    return _to_bgr(image)
 
 
 def write_recording(path: str | Path, fps: int = 30) -> Path:
     """Scroll the storage grid, pause on the Pokédex, then swipe through detail screens."""
     path = Path(path)
-    vw = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (W, H))
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (WIDTH, HEIGHT))
     tall = storage_canvas()
-    max_off = tall.shape[0] - H
-    if max_off <= 0:
-        tall = np.vstack([tall, np.full((H - tall.shape[0] + 1, W, 3), 240, np.uint8)])
-        max_off = tall.shape[0] - H
+    max_offset = tall.shape[0] - HEIGHT
+    if max_offset <= 0:
+        tall = np.vstack([tall, np.full((HEIGHT - tall.shape[0] + 1, WIDTH, 3), 240, np.uint8)])
+        max_offset = tall.shape[0] - HEIGHT
     for _ in range(fps // 2):
-        vw.write(tall[:H])
-    for off in np.linspace(0, max_off, fps * 2).astype(int):  # 2 s scroll
-        vw.write(tall[off : off + H])
+        writer.write(tall[:HEIGHT])
+    for offset in np.linspace(0, max_offset, fps * 2).astype(int):  # 2 s scroll
+        writer.write(tall[offset : offset + HEIGHT])
     for _ in range(fps // 2):
-        vw.write(tall[max_off : max_off + H])
-    for frame in [pokedex_screen()] + [detail_screen(n, f) for n, f in GROUND_TRUTH["detail"]]:
+        writer.write(tall[max_offset : max_offset + HEIGHT])
+    for frame in [pokedex_screen()] + [
+        detail_screen(species_name, family) for species_name, family in GROUND_TRUTH["detail"]
+    ]:
         for _ in range(fps):  # hold each screen 1 s
-            vw.write(frame)
-    vw.release()
+            writer.write(frame)
+    writer.release()
     return path
 
 
 def write_fixtures(out_dir: str | Path) -> tuple[Path, Path]:
     """Write a bag screenshot and a screen recording of the synthetic screens; return both paths."""
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    bag = out / "bag.png"
+    folder = Path(out_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    bag = folder / "bag.png"
     cv2.imwrite(str(bag), bag_screen())
-    return bag, write_recording(out / "recording.mp4")
+    return bag, write_recording(folder / "recording.mp4")
 
 
 if __name__ == "__main__":
