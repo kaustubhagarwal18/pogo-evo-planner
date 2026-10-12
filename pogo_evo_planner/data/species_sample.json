@@ -608,7 +608,7 @@
    {
     "to": "GALLADE",
     "candy": 100,
-    "item": "ITEM_SINNOH_STONE",
+    "item": "ITEM_GEN4_EVOLUTION_STONE",
     "trade_free": false,
     "notes": [
      "gender: MALE"

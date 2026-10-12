@@ -16,17 +16,17 @@ jobs:
       - name: Install
         run: pip install -e '.[ocr,llm,dev]'   # all extras, so mypy and pylint see every import
       - name: Ruff
-        run: ruff check pogo_evo_planner tests
+        run: ruff check pogo_evo_planner tests scripts
       - name: Pylint
         run: |
-          pylint pogo_evo_planner
+          pylint pogo_evo_planner scripts
           pylint tests --disable=duplicate-code
       - name: Mypy
-        run: mypy pogo_evo_planner
+        run: mypy pogo_evo_planner scripts
       - name: Bandit (security)
-        run: bandit -q -r pogo_evo_planner
+        run: bandit -q -r pogo_evo_planner scripts
       - name: Codespell
-        run: codespell pogo_evo_planner tests docs scripts README.md Makefile .github
+        run: codespell pogo_evo_planner tests docs scripts web README.md Makefile .github
 
   secrets:
     runs-on: ubuntu-latest

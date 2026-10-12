@@ -61,12 +61,22 @@ def item_name(item: str) -> str:
     return ITEM_NAMES.get(item) or item.removeprefix("ITEM_").replace("_", " ").title()
 
 
+def _key(name: str) -> str:
+    """A name folded the way game ids are written: "King's Rock" -> KINGS_ROCK."""
+    return name.strip().upper().replace(" ", "_").replace("-", "_").replace("'", "")
+
+
+def evolution_items(species: dict) -> set[str]:
+    """Every item some evolution in the species table needs."""
+    return {e["item"] for s in species.values() for e in s.get("evolutions", []) if e.get("item")}
+
+
 def item_id(name: str, known: set[str]) -> str | None:
-    """The item id for a player's name of it ("Tart Apple", "metal coat") or an id; None if unknown."""
-    key = name.strip().upper().replace(" ", "_").replace("-", "_").replace("'", "")
+    """The item id for an id or a player's name of it ("Tart Apple", "metal coat", ITEM_SINNOH_STONE); None if
+    unknown."""
+    bare = _key(name).removeprefix("ITEM_")
     for item in known:
-        if key in (item, item.removeprefix("ITEM_")) or key == item_name(item).upper().replace(" ", "_")\
-                .replace("-", "_").replace("'", ""):
+        if bare in (item.removeprefix("ITEM_"), _key(item_name(item))):
             return item
     return None
 

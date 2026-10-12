@@ -100,6 +100,23 @@ class CliTests(unittest.TestCase):
         self.assertIn("Rare candy: using 0 of 200", printed)
         self.assertIn('No candy count, so no Rare Candy planned for: Dratini (add their counts under "candy")', printed)
 
+    def test_plan_takes_items_by_the_names_players_use(self):
+        """`plan` uses a Sinnoh Stone written as ITEM_SINNOH_STONE (as the docs once showed), names any item no
+        evolution uses, and stops with one line when a file lists the same item under two names."""
+        kirlia = {"rare_candy": 0, "candy": {"RALTS": 300}, "pokemon": [{"species": "KIRLIA"}, {"species": "KIRLIA"}]}
+        with tempfile.TemporaryDirectory() as d:
+            inv = Path(d) / "inv.json"
+            inv.write_text(json.dumps({**kirlia, "items": {"ITEM_SINNOH_STONE": 1, "Moon Stone": 1}}))
+            message, printed = run("plan", str(inv), "--species", SAMPLE)
+            self.assertEqual(message, "")
+            self.assertIn("Kirlia -> Gallade", printed)
+            self.assertIn("Gallade: needs Sinnoh Stone", printed)   # the name players know, not the game's id
+            self.assertIn("No evolution uses these items, so the plan ignores them: Moon Stone", printed)
+            inv.write_text(json.dumps({**kirlia, "items": {"Sinnoh Stone": 1, "ITEM_GEN4_EVOLUTION_STONE": 2}}))
+            message, _ = run("plan", str(inv), "--species", SAMPLE)
+        self.assertEqual(message, f'error: {inv} isn\'t a valid inventory file: "items" lists Sinnoh Stone twice, '
+                                  "as Sinnoh Stone and ITEM_GEN4_EVOLUTION_STONE; keep one")
+
 
 if __name__ == "__main__":
     unittest.main()

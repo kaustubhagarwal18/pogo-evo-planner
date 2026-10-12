@@ -61,6 +61,7 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
         "source": source,
         "available": p.rare_candy_available, "used": p.rare_candy_used, "total_value": p.total_value,
         "families": families, "trade": trade, "unknown": p.unknown_species,
+        "unknown_items": p.unknown_items,
         "missing_candy": families_missing_candy(inv, species),
         "pokemon": [{"species": s.species, "label": s.label, "status": status(s)} for s in inv.pokemon],
         # national dex numbers pick each species' sprite

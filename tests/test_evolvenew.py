@@ -127,7 +127,7 @@ class EvolvenewTests(unittest.TestCase):
     def test_rare_candy_shown_once_per_family(self):
         """A family's Rare Candy is printed once, as a total, not on each of its evolutions."""
         data, listing = apply_evolvenew({**scanned(candy={"RALTS": 100}, rare=100),
-                                         "items": {"ITEM_SINNOH_STONE": 1},
+                                         "items": {"ITEM_GEN4_EVOLUTION_STONE": 1},
                                          "pokemon": [{"species": "KIRLIA", "cp": cp, "label": ""} for cp in (1, 2)]},
                                         SPECIES)
         inv = inventory_from_dict(data)
@@ -156,7 +156,7 @@ class EvolvenewTests(unittest.TestCase):
     def test_one_copy_of_a_branching_pokemon_takes_one_branch(self):
         """One copy of a branching Pokémon takes one branch; the output says to add another copy."""
         data, listing = apply_evolvenew(scanned("KIRLIA", candy={"RALTS": 400}), SPECIES)
-        data["items"] = {"ITEM_SINNOH_STONE": 1}
+        data["items"] = {"ITEM_GEN4_EVOLUTION_STONE": 1}
         inv = inventory_from_dict(data)
         text = render(plan(SPECIES, TIERS, inv, Settings(new_entries_only=True)), inv, SPECIES, listing)
         self.assertIn("your 1 Kirlia is planned above; if you have another, add a screenshot of its page", text)
@@ -206,7 +206,7 @@ class EvolvenewTests(unittest.TestCase):
         replies = iter(["two", "2", ""])
         asked, said = [], []
         answers = ask_for_items(inv, SPECIES, ask=lambda q: asked.append(q) or next(replies), say=said.append)
-        self.assertEqual(answers, {"ITEM_SINNOH_STONE": 2, "ITEM_METAL_COAT": 0})
+        self.assertEqual(answers, {"ITEM_GEN4_EVOLUTION_STONE": 2, "ITEM_METAL_COAT": 0})
         self.assertEqual(asked[0], "Sinnoh Stone (Kirlia → Gallade): how many? ")
         self.assertIn("type a number", said[1])          # "two" was asked again
         inv.items.update(answers)
@@ -235,7 +235,8 @@ class EvolvenewTests(unittest.TestCase):
         """--candy and --item accept names or ids and reject malformed values."""
         self.assertEqual(candy_overrides(["Dragonair=60"], SPECIES), {"DRATINI": 60})   # name -> its family
         self.assertEqual(item_overrides(["sinnoh stone=2", "ITEM_METAL_COAT=1"], SPECIES),
-                         {"ITEM_SINNOH_STONE": 2, "ITEM_METAL_COAT": 1})
+                         {"ITEM_GEN4_EVOLUTION_STONE": 2, "ITEM_METAL_COAT": 1})
+        self.assertEqual(item_overrides(["ITEM_SINNOH_STONE=1"], SPECIES), {"ITEM_GEN4_EVOLUTION_STONE": 1})
         for bad in (["Dragonair"], ["Dragonair=lots"], ["Notamon=3"]):
             with self.assertRaises(ValueError):
                 candy_overrides(bad, SPECIES)

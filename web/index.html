@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="build" content="{{BUILD}}">
+<meta name="description" content="Plan Pokémon GO evolutions and where your Rare Candy goes, from your own inventory, in your browser.">
+<title>Rare Candy Planner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 9l7 5-7 5zM29 9l-7 5 7 5z' fill='%235b8fd8'/%3E%3Ccircle cx='16' cy='14' r='7.5' fill='%231f5fbf'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css?v={{BUILD}}">
+<script src="app.js?v={{BUILD}}" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9l7 5-7 5zM29 9l-7 5 7 5z" fill="var(--seq-2)"/><circle cx="16" cy="14" r="7.5" fill="var(--seq-1)"/></svg>
+    <div>
+      <h1>Rare Candy Planner</h1>
+      <p>Which evolutions to do and where your Rare Candy goes, planned in your browser.</p>
+    </div>
+  </div>
+  <span class="status" id="status" role="status" data-state="loading">Loading the planner…</span>
+</header>
+
+<nav class="tabs" aria-label="Show">
+  <button type="button" data-pane="inv" aria-pressed="true">Inventory</button>
+  <button type="button" data-pane="plan" aria-pressed="false">Plan</button>
+</nav>
+
+<main class="layout" id="layout" data-pane="inv">
+  <section class="pane" id="pane-inv" aria-label="Inventory">
+    <p class="msg" id="msg" role="alert" hidden></p>
+
+    <div class="start" id="start">
+      <h2>Start with your inventory</h2>
+      <p>Open the <code>inventory.json</code> or <code>evolvenew.json</code> that
+        <code>pogo-evo-planner scan</code> or <code>evolvenew</code> saved, or type yours in here.</p>
+      <div class="actions">
+        <label class="btn primary">Open a file<input type="file" class="pick" accept=".json,application/json" hidden></label>
+        <button type="button" class="btn" id="sample">Try the example</button>
+        <button type="button" class="btn" id="blank">Start empty</button>
+      </div>
+      <p class="hint">Or drop the file anywhere on this page. It stays in this browser: nothing is uploaded.</p>
+    </div>
+
+    <div class="editor" id="editor" hidden>
+      <div class="filebar">
+        <div><b id="name"></b><span class="hint" id="saved">Saved in this browser</span></div>
+        <div class="actions">
+          <button type="button" class="btn small" id="download">Download</button>
+          <label class="btn small">Open<input type="file" class="pick" accept=".json,application/json" hidden></label>
+          <button type="button" class="btn small quiet" id="close">Close</button>
+        </div>
+      </div>
+
+      <section class="card needs" id="needs" aria-labelledby="needs-h" hidden>
+        <h2 id="needs-h">The plan needs a few numbers</h2>
+        <p class="help">Without these counts, the plan can't use the evolutions below. Leave one blank if you
+          don't know it: a family without a candy count gets no Rare Candy.</p>
+        <div class="rows" id="needs-rows"></div>
+      </section>
+
+      <section class="card">
+        <label class="rare"><span><b>Rare Candy</b><span class="help">From your item bag</span></span>
+          <input type="number" id="rare" min="0" step="1" inputmode="numeric"></label>
+      </section>
+
+      <input type="search" class="find" id="find" placeholder="Find a Pokémon, family or item" aria-label="Find">
+
+      <details class="card" open>
+        <summary><h2>Candy</h2><span class="count" id="n-candy"></span></summary>
+        <p class="help">Each family's count, as any of its Pokémon's pages shows it.</p>
+        <div class="rows" id="candy"></div>
+        <form class="add" id="add-candy">
+          <input name="name" list="dl-species" placeholder="Family or any of its Pokémon" aria-label="Family" required>
+          <input name="n" type="number" min="0" step="1" inputmode="numeric" placeholder="Candy" aria-label="Candy" required>
+          <button class="btn">Set</button>
+          <p class="err" hidden></p>
+        </form>
+      </details>
+
+      <details class="card" open>
+        <summary><h2>Pokémon</h2><span class="count" id="n-pokemon"></span></summary>
+        <p class="help">List each species once, or once per evolution you want from a branching line like Eevee.</p>
+        <div class="chips" id="pokemon"></div>
+        <form class="add" id="add-pokemon">
+          <input name="name" list="dl-species" placeholder="Species, like Dratini" aria-label="Species" required>
+          <button class="btn">Add</button>
+          <p class="err" hidden></p>
+        </form>
+      </details>
+
+      <details class="card">
+        <summary><h2>Evolution items</h2><span class="count" id="n-items"></span></summary>
+        <p class="help">Stones, apples, lure modules and the like, from your item bag.</p>
+        <div class="rows" id="items"></div>
+        <form class="add" id="add-item">
+          <input name="name" list="dl-items" placeholder="Item, like Metal Coat" aria-label="Item" required>
+          <input name="n" type="number" min="0" step="1" inputmode="numeric" placeholder="How many" aria-label="How many" required>
+          <button class="btn">Set</button>
+          <p class="err" hidden></p>
+        </form>
+      </details>
+
+      <details class="card">
+        <summary><h2>Pokédex</h2><span class="count" id="n-pokedex"></span></summary>
+        <p class="help">Species you've registered but don't hold any more. The Pokémon you hold count already.</p>
+        <div class="chips" id="pokedex"></div>
+        <form class="add" id="add-pokedex">
+          <input name="name" list="dl-species" placeholder="Species" aria-label="Species" required>
+          <button class="btn">Add</button>
+          <p class="err" hidden></p>
+        </form>
+      </details>
+
+      <details class="card">
+        <summary><h2>Never caught</h2><span class="count" id="n-not_caught"></span></summary>
+        <p class="help">Species you've never caught. These win over a Pokémon read from storage by mistake.</p>
+        <div class="chips" id="not_caught"></div>
+        <form class="add" id="add-not_caught">
+          <input name="name" list="dl-species" placeholder="Species" aria-label="Species" required>
+          <button class="btn">Add</button>
+          <p class="err" hidden></p>
+        </form>
+      </details>
+
+      <details class="card" id="settings">
+        <summary><h2>Planner settings</h2></summary>
+        <label class="opt"><input type="checkbox" data-opt="new_entries_only">
+          <span><b>New Pokédex entries only</b><span class="help">Only evolutions into species you've never caught
+            count, one form per entry. <code>evolvenew</code> plans this way.</span></span></label>
+        <label class="opt"><input type="checkbox" data-opt="allow_trade_evolutions">
+          <span><b>Spend candy on trade evolutions</b><span class="help">Off: evolutions that cost no candy when
+            traded are listed under trading instead.</span></span></label>
+        <label class="opt num"><span><b>Value of a new Pokédex entry</b><span class="help">In km of buddy walking.
+          Default 20.</span></span><input type="number" data-opt="dex_bonus" min="0" step="1"></label>
+        <label class="opt num"><span><b>Value of a repeat</b><span class="help">Share of the value kept by evolving
+          into a species you already own, 0 to 1. Default 0.</span></span>
+          <input type="number" data-opt="repeat_value" min="0" max="1" step="0.1"></label>
+        <button type="button" class="btn small quiet" id="defaults">Reset to defaults</button>
+      </details>
+    </div>
+
+    <footer class="foot">
+      <p>Your inventory stays in this browser. The page downloads Python from jsDelivr, fonts from Google
+        Fonts and Pokémon pictures from PokeAPI; none of them receive your inventory.</p>
+      <p>From <a href="https://github.com/kaustubhagarwal18/pogo-evo-planner">pogo-evo-planner</a>, which also
+        reads your screenshots into an inventory. Not affiliated with Niantic, Scopely, Nintendo or The Pokémon
+        Company. Pokémon © Nintendo, Creatures, GAME FREAK and The Pokémon Company.</p>
+    </footer>
+  </section>
+
+  <section class="pane" id="pane-plan" aria-label="Plan">
+    <div class="planbar">
+      <span id="plan-state" role="status"></span>
+      <span class="actions">
+        <button type="button" class="btn small" id="copy" disabled>Copy as text</button>
+        <button type="button" class="btn small" id="dl-dash" disabled>Download dashboard</button>
+      </span>
+    </div>
+    <p class="msg" id="plan-error" role="alert" hidden></p>
+    <div class="placeholder" id="plan-empty">
+      <p>Your plan appears here once an inventory is open.</p>
+    </div>
+    <iframe id="dash" title="Evolution plan" hidden
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
+    <details class="card" id="text-plan" hidden>
+      <summary><h2>Plain-text plan</h2></summary>
+      <pre id="report"></pre>
+    </details>
+  </section>
+</main>
+
+<datalist id="dl-species"></datalist>
+<datalist id="dl-items"></datalist>
+</body>
+</html>

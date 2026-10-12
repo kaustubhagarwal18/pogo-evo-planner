@@ -1,0 +1,48 @@
+name: pages
+
+# Builds the browser app (web/) with the latest game master and publishes it on GitHub Pages: on pushes
+# to main, every Monday (so new species reach the site without a code change), and by hand from the
+# Actions tab. Pages must be switched on once: Settings -> Pages -> Source: GitHub Actions.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write      # publish to Pages
+  id-token: write   # prove to Pages that this workflow is the one publishing
+
+concurrency:
+  group: pages
+  cancel-in-progress: false   # let a deployment that has started finish
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install
+        run: pip install -e .   # the planner alone: building the site needs no extras
+      - name: Game master
+        run: ./scripts/fetch_gamemaster.sh
+      - name: Build the site
+        run: python scripts/build_web.py
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
