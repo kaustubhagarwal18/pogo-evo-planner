@@ -16,5 +16,8 @@ captures/
 /evolvenew*.json
 /dashboard.html
 
+# the browser app as `make web` builds it
+site/
+
 # notes for Claude Code, kept local
 CLAUDE.md

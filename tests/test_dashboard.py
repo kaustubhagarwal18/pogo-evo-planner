@@ -29,6 +29,11 @@ class DashboardTest(unittest.TestCase):
         self.assertNotIn("/*DATA*/null", page)
         self.assertNotIn('"</script>"', page)
 
+    def test_lists_items_no_evolution_uses(self):
+        """Items no evolution needs are named on the page, so a misspelt item isn't silently ignored."""
+        inv = Inventory(0, {}, {"Sinoh Stone": 1}, set(), [])
+        self.assertEqual(build_view(plan(SPECIES, TIERS, inv), inv, SPECIES)["unknown_items"], ["Sinoh Stone"])
+
 
 if __name__ == "__main__":
     unittest.main()

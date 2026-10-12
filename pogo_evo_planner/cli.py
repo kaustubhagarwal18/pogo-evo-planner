@@ -19,7 +19,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .gamemaster import load_species
+from .gamemaster import item_name, load_species
 from .inventory import Inventory, load_inventory, load_pokemon_csv
 from .planner import Plan, Settings, plan
 from .scan import LLM_READERS, READERS
@@ -54,7 +54,7 @@ def render(p: Plan) -> str:
                 chain = " -> ".join([_title(path.steps[0].frm)] + [_title(s.to) for s in path.steps])
                 out.append(f"   {chain}")
                 for s in path.steps:
-                    item = [f"needs {s.item.removeprefix('ITEM_').replace('_', ' ').title()}"] if s.item else []
+                    item = [f"needs {item_name(s.item)}"] if s.item else []
                     extras = item + list(s.notes)
                     if extras:
                         out.append(f"      {_title(s.to)}: {'; '.join(extras)}")
@@ -70,6 +70,9 @@ def render(p: Plan) -> str:
                    + ' (add their counts under "candy")')
     if p.unknown_species:
         out.append("Not in species data (skipped): " + ", ".join(p.unknown_species))
+    if p.unknown_items:
+        out.append("No evolution uses these items, so the plan ignores them: " + ", ".join(p.unknown_items)
+                   + ' (check their names under "items")')
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -134,7 +137,7 @@ def _save(path: str | Path, inv: dict) -> None:
 def _make_plan(a, species: dict, inventory_path: str | Path) -> tuple[Plan, Inventory]:
     """Load the tiers and inventory and run the planner."""
     tiers = _load("rarity tiers", _read_json, a.tiers)
-    inv = _load("inventory", load_inventory, inventory_path)
+    inv = _load("inventory", lambda path: load_inventory(path, species=species), inventory_path)
     if getattr(a, "pokemon_csv", None):
         inv.pokemon = _load("Pokémon CSV", load_pokemon_csv, a.pokemon_csv)
     result = plan(species, tiers, inv, Settings(dex_bonus=a.dex_bonus, repeat_value=a.repeat_value,
@@ -244,7 +247,6 @@ def _ask_and_replan(a, species: dict, inv: dict, plan_inv: Inventory) -> tuple[P
     """Ask for the missing candy counts and evolution items, save the answers and plan again with them.
     None when nothing was given."""
     from .evolvenew import ask_for_candy, ask_for_items
-    from .gamemaster import item_name
 
     def read_candy(paths: list[str]) -> dict[str, int]:
         """Read candy counts from detail-page screenshots; raises, so a bad path is asked again."""

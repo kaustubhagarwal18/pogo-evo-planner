@@ -4,7 +4,7 @@ JSON format (see examples/inventory_sample.json):
 {
   "rare_candy": 120,
   "candy": {"DRATINI": 60, ...},          # keyed by family (base species)
-  "items": {"ITEM_METAL_COAT": 1, ...},
+  "items": {"ITEM_METAL_COAT": 1, "Sinnoh Stone": 1, ...},   # by id or by the name players know
   "pokedex": ["DRATINI", ...],            # species already registered
   "not_caught": ["DRAGONITE", ...],       # never caught (silhouette on an EVOLVE button)
   "pokemon": [{"species": "DRATINI", "iv": [15, 13, 14]}, ...]
@@ -20,6 +20,8 @@ import csv
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from .gamemaster import evolution_items, item_id, item_name
 
 _SPECIES_COLS = ("species", "name", "pokemon")
 _IV_COLS = (("atk iv", "atk", "attack"), ("def iv", "def", "defense"), ("sta iv", "sta", "stamina", "hp iv"))
@@ -82,20 +84,40 @@ def load_pokemon_csv(path: str | Path) -> list[Specimen]:
     return out
 
 
-def load_inventory(path: str | Path, pokemon_csv: str | Path | None = None) -> Inventory:
-    """Load an inventory JSON, optionally taking the Pokémon list from a CSV instead."""
+def load_inventory(path: str | Path, pokemon_csv: str | Path | None = None, species: dict | None = None) -> Inventory:
+    """Load an inventory JSON, optionally taking the Pokémon list from a CSV instead. With a species table, items
+    may be named as players know them."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    return inventory_from_dict(data, load_pokemon_csv(pokemon_csv) if pokemon_csv else None)
+    return inventory_from_dict(data, load_pokemon_csv(pokemon_csv) if pokemon_csv else None, species)
 
 
-def inventory_from_dict(data: dict, pokemon: list[Specimen] | None = None) -> Inventory:
-    """Build an Inventory from the inventory JSON structure (as `scan` writes it)."""
+def _items(raw: dict, species: dict | None) -> dict[str, int]:
+    """Item counts keyed by the game's ids. With a species table, the names players use ("Sinnoh Stone",
+    ITEM_SINNOH_STONE) become ids too; an item no evolution needs keeps its key, and the plan reports it.
+    Raises ValueError when one item is listed under two names, rather than guess which count is right."""
+    items = {k: int(v) for k, v in raw.items()}
+    if species is None:
+        return items
+    known = evolution_items(species)
+    out: dict[str, int] = {}
+    written: dict[str, str] = {}
+    for key, n in items.items():
+        item = item_id(key, known) or key
+        if item in out:
+            raise ValueError(f'"items" lists {item_name(item)} twice, as {written[item]} and {key}; keep one')
+        out[item], written[item] = n, key
+    return out
+
+
+def inventory_from_dict(data: dict, pokemon: list[Specimen] | None = None, species: dict | None = None) -> Inventory:
+    """Build an Inventory from the inventory JSON structure (as `scan` writes it). With a species table, items
+    may be named as players know them ("Sinnoh Stone")."""
     if pokemon is None:
         pokemon = [_specimen(p, i) for i, p in enumerate(data.get("pokemon", []))]
     return Inventory(
         rare_candy=int(data.get("rare_candy", 0)),
         candy={_norm(k): int(v) for k, v in data.get("candy", {}).items()},
-        items={k: int(v) for k, v in data.get("items", {}).items()},
+        items=_items(data.get("items", {}), species),
         pokedex={_norm(s) for s in data.get("pokedex", [])},
         not_caught={_norm(s) for s in data.get("not_caught", [])},
         pokemon=pokemon,

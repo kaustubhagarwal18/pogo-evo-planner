@@ -17,7 +17,7 @@ import shlex
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from .gamemaster import item_id, item_name
+from .gamemaster import evolution_items, item_id, item_name
 from .inventory import Inventory
 from .planner import Plan
 
@@ -331,7 +331,7 @@ def candy_overrides(pairs: list[str], species: dict) -> dict[str, int]:
 
 def item_overrides(pairs: list[str], species: dict) -> dict[str, int]:
     """Parse --item values like "Tart Apple=26" or ITEM_METAL_COAT=1 into {item id: count}."""
-    known = {e["item"] for s in species.values() for e in s.get("evolutions", []) if e.get("item")}
+    known = evolution_items(species)
     out = {}
     for pair in pairs:
         name, sep, count = pair.rpartition("=")

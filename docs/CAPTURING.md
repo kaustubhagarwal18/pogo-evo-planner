@@ -51,8 +51,10 @@ and detail pages are the better input: each frame is one model request, so a rec
 hundreds of frames are slow with Ollama and costly with Claude.
 
 Read the warnings it prints (missing families, conflicting readings), fix anything wrong
-in `inventory.json`, and add evolution items you hold under `"items"`, e.g.
-`{"ITEM_METAL_COAT": 2, "ITEM_SINNOH_STONE": 1}`.
+in `inventory.json`, and add evolution items you hold under `"items"`, by the names the game
+shows, e.g. `{"Metal Coat": 2, "Sinnoh Stone": 1}`. The game master's ids work too
+(`ITEM_GEN4_EVOLUTION_STONE` is the Sinnoh Stone). The plan names any item no evolution uses,
+so a misspelt one doesn't go unnoticed.
 
 ## Privacy
 

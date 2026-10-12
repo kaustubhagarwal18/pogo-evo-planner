@@ -38,6 +38,28 @@ It never logs in to or talks to the game servers, and never taps or swipes in th
 The player moves through their own screens; this only reads them. That is the same line
 long-running scanner apps stay behind, and it keeps accounts safe from Terms of Service bans.
 
+## In your browser
+
+**[Open the planner](https://kaustubhagarwal18.github.io/pogo-evo-planner/)** to plan without
+installing anything. You can open an `inventory.json` or `evolvenew.json` that the commands below
+saved, try the example, or type your inventory in. The plan and the dashboard update as you edit,
+and the page asks for any candy counts and evolution items the plan is missing.
+
+The planner's Python runs inside the page ([Pyodide](https://pyodide.org)), so your inventory
+never leaves your browser. The browser keeps it between visits, and **Download** saves your edits
+as a file. The first visit downloads about 6 MB of Python from jsDelivr, which the browser then
+caches. The page doesn't read screenshots yet: make the inventory with `scan` or `evolvenew`.
+
+To run it from a clone instead (after the quick start below), build it and serve it on
+http://localhost:8000:
+
+```bash
+make serve
+```
+
+`make web` only builds it, into `site/`. Both use every species once `make gamemaster` has run,
+and the bundled sample otherwise.
+
 ## Quick start
 
 Requires Python 3.10+. Get the code and set it up once:
@@ -193,8 +215,8 @@ pogo-evo-planner scan bag.png recording.mp4 -o inventory.json
 ```
 
 Review `inventory.json`. Add any candy counts the scan missed under `"candy"`: a family without one
-gets no Rare Candy, because its count is unknown, not 0. Add evolution items under `"items"`. Then
-plan:
+gets no Rare Candy, because its count is unknown, not 0. Add evolution items under `"items"`, by
+the names the game shows, like `{"Sinnoh Stone": 1, "Tart Apple": 26}`. Then plan:
 
 ```bash
 pogo-evo-planner plan inventory.json
@@ -397,6 +419,16 @@ isn't listed). It flags families whose candy count wasn't scanned. Pokémon spri
 online; offline, each shows its initial instead. The file lists your Pokémon, so it is gitignored
 like `inventory.json`.
 
+### Browser app (`web/`, `pogo_evo_planner/webapp.py`)
+
+A static page with no server code. A web worker loads Pyodide and unpacks the planner package
+(`planner.zip`) into it. The page sends the inventory as JSON to `webapp.WebPlanner`, which
+plans it with the same `planner.plan`, `cli.render` and dashboard as the commands do. The
+dashboard is shown in a sandboxed frame. `scripts/build_web.py` assembles the site: the page, the
+package, the species table (normalized from the game master) and the example inventory. It stamps
+a build id into the page so browsers fetch changed files rather than cached ones. The **pages**
+workflow builds it with the latest game master and publishes it on GitHub Pages.
+
 ## Data
 
 - `pogo_evo_planner/data/species_sample.json`: ~65 hand-entered species for tests and demos.
@@ -422,9 +454,11 @@ for what's next and [CHANGELOG.md](CHANGELOG.md) for what each version changed.
 - `make test`: all tests, including end-to-end OCR (about 30 s).
 - `make test-fast`: skips the OCR end-to-end test.
 - `make lint`: ruff, pylint, mypy, bandit, codespell, and gitleaks if installed.
+- `make web`: builds the browser app into `site/`; `make serve` also serves it at
+  http://localhost:8000.
 
 Linter settings and pinned linter versions live in `pyproject.toml`, so `make lint` runs what CI
-runs. Two GitHub Actions workflows run on GitHub:
+runs. Three GitHub Actions workflows run on GitHub:
 
 - **tests** (`.github/workflows/tests.yml`): everything in `tests/` with pytest, on pull requests
   (including from forks), on pushes to `main`, and by hand from the Actions tab for a branch
@@ -432,5 +466,9 @@ runs. Two GitHub Actions workflows run on GitHub:
   `test-rapidocr` uses RapidOCR (non-blocking).
 - **ci** (`.github/workflows/ci.yml`), on pushes to `main` and on pull requests: `lint` (ruff,
   pylint, mypy, bandit, codespell) and `secrets` (gitleaks over the full git history).
+- **pages** (`.github/workflows/pages.yml`): builds the browser app with the latest game master
+  and publishes it on GitHub Pages, on pushes to `main`, every Monday (so new species arrive
+  without a code change) and by hand. It needs Pages switched on once, under Settings → Pages →
+  Source: GitHub Actions.
 
 Not affiliated with Niantic, Scopely, Nintendo or The Pokémon Company.

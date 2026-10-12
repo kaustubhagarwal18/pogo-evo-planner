@@ -11,6 +11,8 @@ Two commands share the same scanner and planner:
 - **`scan`, then `plan` or `dashboard`**: it reads the whole collection into an `inventory.json`
   that the player reviews and edits by hand.
 
+The browser app (6) runs the same planner on an inventory either command saved, inside the page.
+
 ```mermaid
 flowchart LR
     subgraph scan["scan/"]
@@ -51,7 +53,7 @@ planner can be re-run after hand edits without rescanning.
 | `pokedex` | Pokédex screen, coloured Evolve buttons | species ever caught |
 | `pokedex_seen_only` | Pokédex screen | seen but never caught (informational) |
 | `not_caught` | silhouette on an Evolve button | species never caught; overrides storage |
-| `items` | typed by hand | evolution items (Metal Coat, Sinnoh Stone, lures) |
+| `items` | typed by hand | evolution items (Metal Coat, Sinnoh Stone, lures), by name or game id |
 
 The species table (`gamemaster.py`) supplies each species' family, dex number, buddy km,
 evolutions (candy, item, notes, `trade_free`) and rarity class.
@@ -290,7 +292,50 @@ missing from the species data.
 | `new_entries_only` | off | set by `evolvenew` | only evolutions into never-caught species count; the forms of one Pokédex entry count once |
 | `rare_candy_blocked_families` | none | — | more families that may only use their own candy (a family without a candy count already is) |
 
-## 6. Where to look
+## 6. The browser app (`web/`)
+
+The page is static: no server code runs, so any static host can serve it. The planner's own Python
+runs in the browser through Pyodide, and the inventory never leaves the page.
+
+```mermaid
+flowchart LR
+    B[scripts/build_web.py] --> Z[(planner.zip<br/>the package)]
+    B --> SJ[(species.json<br/>normalized game master)]
+    B --> W[(index.html, app.js,<br/>worker.js, style.css)]
+    subgraph browser["browser"]
+        A[app.js<br/>open, edit, keep the inventory] -->|inventory + settings, JSON| K[worker.js<br/>Pyodide]
+        K --> WP[webapp.WebPlanner<br/>planner.plan, cli.render, dashboard]
+        WP -->|report, dashboard,<br/>missing counts| A
+        A --> F[sandboxed frame<br/>the dashboard]
+    end
+    Z --> K
+    SJ --> K
+```
+
+- **Worker.** `worker.js` is a module worker. It loads Pyodide from jsDelivr, unpacks `planner.zip`
+  and builds one `WebPlanner` with the species table. A long plan never freezes the page. Requests
+  and replies are JSON strings, so nothing needs converting between JavaScript and Python. While one
+  plan runs, only the newest edit waits for the next one.
+- **What `WebPlanner` returns.** `plan_json` gives the text report, the dashboard page and the
+  Rare Candy totals. It also lists what the plan is missing: families without a candy count
+  (`families_missing_candy`), and evolution items the inventory doesn't list that an owned Pokémon
+  needs, at any depth, to reach a species not owned yet (`items_to_ask`). An unlisted item is
+  unknown, so the page asks for it, as it does for a missing candy count. A bad inventory comes back
+  as `{"error": ...}`, in one line.
+- **Editor.** `app.js` checks a file as it opens, keeping fields it doesn't use so a download gives
+  back everything. It normalizes names to ids ("Mr. Mime" to `MR_MIME`), refuses species and items
+  the species table doesn't have, and flags rows the plan will skip. It saves the inventory and the
+  settings in the browser's `localStorage` (the page still works if storage is off). It plans again
+  250 ms after the last edit.
+- **Dashboard frame.** The dashboard HTML goes into an `<iframe>` sandboxed without
+  `allow-same-origin`, so its scripts can't reach the page or its storage; its links open in a new tab. A small script added to it reports its
+  height, so the frame fits it.
+- **Build.** `build_web.py` zips the package with fixed dates, so the same files give the same
+  bytes. It stamps a hash of every file into `index.html` as the build id, and the page adds that
+  id to every URL it loads, so a deployment is never mixed with cached files. It refuses to replace
+  an output folder it didn't build.
+
+## 7. Where to look
 
 | Concern | Code |
 |---|---|
@@ -303,3 +348,6 @@ missing from the species data.
 | the `evolvenew` flow: what's missing, the questions, the plain-words plan | [`evolvenew.py`](../pogo_evo_planner/evolvenew.py) |
 | commands, their error messages, text report | [`cli.py`](../pogo_evo_planner/cli.py) |
 | dashboard data | [`dashboard.py`](../pogo_evo_planner/dashboard.py) |
+| what the browser app calls: plan JSON, missing counts, catalog | [`webapp.py`](../pogo_evo_planner/webapp.py) |
+| the browser app's editor, worker and styles | [`web/`](../web/) |
+| building the site; publishing it | [`scripts/build_web.py`](../scripts/build_web.py), [`pages.yml`](../.github/workflows/pages.yml) |

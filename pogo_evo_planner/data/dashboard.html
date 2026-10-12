@@ -367,5 +367,7 @@ if (skipped.length) {
   $('skipped').appendChild(sc);
 } else $('skipped').appendChild(el('p', 'empty', 'Everything is in the plan or fully evolved.'));
 if (DATA.unknown.length) $('skipped').appendChild(el('p', 'foot', 'Not in species data: ' + DATA.unknown.map(title).join(', ') + '.'));
+if (DATA.unknown_items && DATA.unknown_items.length) $('skipped').appendChild(el('p', 'foot',
+  'No evolution uses these items, so the plan ignores them: ' + DATA.unknown_items.join(', ') + '. Check their names in the inventory file.'));
 
 </script>

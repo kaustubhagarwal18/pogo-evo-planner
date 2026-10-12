@@ -5,8 +5,8 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from pogo_evo_planner.gamemaster import load_species, parse_game_master
-from pogo_evo_planner.inventory import Inventory, Specimen
+from pogo_evo_planner.gamemaster import ITEM_NAMES, evolution_items, load_species, parse_game_master
+from pogo_evo_planner.inventory import Inventory, Specimen, inventory_from_dict
 from pogo_evo_planner.planner import (
     Settings,
     candy_from_base,
@@ -78,7 +78,7 @@ class PlannerTests(unittest.TestCase):
             inv = Inventory(
                 rare_candy=rng.choice([0, 10, 40, 75, 120, 200]),
                 candy={f: rng.choice([0, 12, 25, 50, 90, 130, 380]) for f in fams},
-                items={"ITEM_METAL_COAT": rng.randint(0, 1), "ITEM_SINNOH_STONE": rng.randint(0, 1)},
+                items={"ITEM_METAL_COAT": rng.randint(0, 1), "ITEM_GEN4_EVOLUTION_STONE": rng.randint(0, 1)},
                 pokedex=set(rng.sample(sorted(SPECIES), 15)),
                 pokemon=mons,
             )
@@ -220,7 +220,7 @@ class PlannerTests(unittest.TestCase):
         kept = Counter(s.species for s in keep_specimens(mons, SPECIES, {"VAPOREON", "JOLTEON", "GALLADE"}))
         self.assertEqual(kept, {"EEVEE": 6, "KIRLIA": 1, "DRATINI": 1})
         # two Kirlia can become Gardevoir and Gallade
-        inv = Inventory(0, {"RALTS": 200}, {"ITEM_SINNOH_STONE": 1}, set(),
+        inv = Inventory(0, {"RALTS": 200}, {"ITEM_GEN4_EVOLUTION_STONE": 1}, set(),
                         [Specimen("KIRLIA", label="a"), Specimen("KIRLIA", label="b"), Specimen("KIRLIA", label="c")])
         targets = sorted(path.targets[-1] for f in plan(SPECIES, TIERS, inv).families for path in f.paths)
         self.assertEqual(targets, ["GALLADE", "GARDEVOIR"])
@@ -245,6 +245,30 @@ class PlannerTests(unittest.TestCase):
         p = plan(SPECIES, TIERS, inv)
         self.assertEqual(p.rare_candy_used, 0)
         self.assertEqual([s.to for _, s in p.trade_instead], ["GENGAR"])
+
+    def test_items_by_the_names_players_use(self):
+        """Items named as players know them are keyed by the game's ids; an unknown one keeps its key, and the same
+        item under two names is an error rather than a guess."""
+        inv = inventory_from_dict({"items": {"Sinnoh Stone": 1, "metal coat": 2, "Moon Stone": 3}}, species=SPECIES)
+        self.assertEqual(inv.items, {"ITEM_GEN4_EVOLUTION_STONE": 1, "ITEM_METAL_COAT": 2, "Moon Stone": 3})
+        old = inventory_from_dict({"items": {"ITEM_SINNOH_STONE": 1}}, species=SPECIES)   # the docs' old example
+        self.assertEqual(old.items, {"ITEM_GEN4_EVOLUTION_STONE": 1})
+        with self.assertRaisesRegex(ValueError, "lists Sinnoh Stone twice"):
+            inventory_from_dict({"items": {"Sinnoh Stone": 1, "ITEM_GEN4_EVOLUTION_STONE": 1}}, species=SPECIES)
+        self.assertEqual(inventory_from_dict({"items": {"Sinnoh Stone": 1}}).items, {"Sinnoh Stone": 1})  # no table
+
+    def test_items_no_evolution_uses_are_reported(self):
+        """An item no evolution needs, like a misspelt one, is listed in the plan rather than silently ignored."""
+        inv = Inventory(0, {}, {"Sinoh Stone": 1, "ITEM_METAL_COAT": 1}, set(), [])
+        self.assertEqual(plan(SPECIES, TIERS, inv).unknown_items, ["Sinoh Stone"])
+
+    def test_sample_data_uses_the_game_masters_item_ids(self):
+        """The bundled species and example name items by the game master's ids, never by a player's name made into
+        an id (ITEM_SINNOH_STONE for ITEM_GEN4_EVOLUTION_STONE), which the real game data doesn't match."""
+        made_up = {"ITEM_" + name.upper().replace(" ", "_").replace("-", "_").replace("'", "")
+                   for name in ITEM_NAMES.values()} - set(ITEM_NAMES)
+        example = json.loads((ROOT / "examples/inventory_sample.json").read_text(encoding="utf-8"))
+        self.assertEqual(made_up & (evolution_items(SPECIES) | set(example["items"])), set())
 
     def test_parse_raw_game_master(self):
         """A raw PokeMiners game master entry is parsed into the species table format."""

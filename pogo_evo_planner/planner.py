@@ -35,6 +35,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 
+from .gamemaster import evolution_items
 from .inventory import Inventory, Specimen
 
 
@@ -94,6 +95,7 @@ class Plan:
     trade_instead: list[tuple[Specimen, Step]] = field(default_factory=list)
     unknown_species: list[str] = field(default_factory=list)
     no_candy_count: list[str] = field(default_factory=list)   # families that needed Rare Candy but have no count
+    unknown_items: list[str] = field(default_factory=list)    # item keys no evolution needs, as written
 
 
 @dataclass
@@ -358,4 +360,6 @@ def plan(species: dict, tiers: dict, inv: Inventory, settings: Settings | None =
         if k not in seen:
             seen.add(k)
             trades.append((spec, step))
-    return Plan(inv.rare_candy, r_used, total, families, trades, unknown, sorted(held_back))
+    needed = evolution_items(species)
+    return Plan(inv.rare_candy, r_used, total, families, trades, unknown, sorted(held_back),
+                sorted(k for k in inv.items if k not in needed))
