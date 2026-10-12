@@ -1,4 +1,4 @@
-.PHONY: install install-ocr test test-fast lint gamemaster demo mock web serve
+.PHONY: install install-ocr test test-fast lint format gamemaster demo mock web serve
 
 # full game data once `make gamemaster` has fetched it, else the bundled sample
 SPECIES := $(if $(wildcard data/latest.json),--species data/latest.json)
@@ -15,8 +15,9 @@ test:               ## full suite incl. end-to-end OCR on synthetic screens (~30
 test-fast:          ## skip the slow OCR end-to-end test
 	SKIP_SLOW=1 python -m unittest discover -s tests -t .
 
-lint:               ## ruff, pylint, mypy, bandit, codespell (+ gitleaks if installed)
+lint:               ## ruff (lint and format check), pylint, mypy, bandit, codespell (+ gitleaks if installed)
 	ruff check pogo_evo_planner tests scripts
+	ruff format --check pogo_evo_planner tests scripts
 	pylint pogo_evo_planner scripts
 	pylint tests --disable=duplicate-code
 	mypy pogo_evo_planner scripts
@@ -24,6 +25,9 @@ lint:               ## ruff, pylint, mypy, bandit, codespell (+ gitleaks if inst
 	codespell pogo_evo_planner tests docs scripts web README.md Makefile .github
 	@if command -v gitleaks >/dev/null; then gitleaks git --redact --no-banner .; \
 	 else echo "gitleaks not installed, skipping secret scan (brew install gitleaks)"; fi
+
+format:             ## format the Python code with ruff (make lint checks it)
+	ruff format pogo_evo_planner tests scripts
 
 gamemaster:         ## download the latest datamined game master to data/latest.json
 	./scripts/fetch_gamemaster.sh

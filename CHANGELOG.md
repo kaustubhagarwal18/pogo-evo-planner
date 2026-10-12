@@ -22,6 +22,10 @@ Before 1.0, a new minor version may change commands or file formats.
 - The `pages` workflow builds the site with the latest game master and publishes it: on pushes
   to `main`, every Monday, and by hand.
 
+### Changed
+
+- The Python code is formatted with `ruff format` (`make format`), and `make lint` and CI check it.
+
 ### Fixed
 
 - A Sinnoh Stone listed as `ITEM_SINNOH_STONE`, as `docs/CAPTURING.md` showed, was never used. The
