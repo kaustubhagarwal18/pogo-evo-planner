@@ -8,6 +8,7 @@ Pyodide), the normalized species table as species.json, and the example inventor
 goes in: only the package, the game data and the bundled example. Needs the package installed
 (`make install`), and reads the species from data/latest.json when `make gamemaster` has fetched it.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,7 +36,7 @@ def package_zip() -> bytes:
     with zipfile.ZipFile(buf, "w") as z:
         for f in sorted(PACKAGE.rglob("*")):
             if f.is_file() and "__pycache__" not in f.parts and f.suffix in (".py", ".json", ".html"):
-                info = zipfile.ZipInfo(f.relative_to(ROOT).as_posix())   # fixed date, so the build id is stable
+                info = zipfile.ZipInfo(f.relative_to(ROOT).as_posix())  # fixed date, so the build id is stable
                 info.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(info, f.read_bytes())
     return buf.getvalue()
@@ -68,9 +69,13 @@ def write_site(out: Path, files: dict[str, bytes]) -> None:
 def main(argv: list[str] | None = None) -> None:
     """Build the site and say what went into it."""
     ap = argparse.ArgumentParser(description="Build the browser app into a folder for a static web host.")
-    ap.add_argument("--species", type=Path, default=LATEST if LATEST.exists() else SAMPLE_SPECIES,
-                    help="PokeMiners latest.json or a normalized species table "
-                         "(default: data/latest.json from `make gamemaster`, else the small bundled sample)")
+    ap.add_argument(
+        "--species",
+        type=Path,
+        default=LATEST if LATEST.exists() else SAMPLE_SPECIES,
+        help="PokeMiners latest.json or a normalized species table "
+        "(default: data/latest.json from `make gamemaster`, else the small bundled sample)",
+    )
     ap.add_argument("-o", "--output", type=Path, default=ROOT / "site", help="folder to write (default: site/)")
     a = ap.parse_args(argv)
     try:
@@ -78,7 +83,7 @@ def main(argv: list[str] | None = None) -> None:
         write_site(a.output, files)
     except OSError as e:
         sys.exit(f"error: can't build the site: {e.strerror or e}: {e.filename}")
-    except ValueError as e:   # a species file that isn't JSON, or an output folder that isn't ours
+    except ValueError as e:  # a species file that isn't JSON, or an output folder that isn't ours
         sys.exit(f"error: {e}")
     sample = " (the bundled sample; run `make gamemaster` for every species)" if a.species == SAMPLE_SPECIES else ""
     print(f"Built {a.output}: {n} species from {a.species}{sample}, {sum(map(len, files.values())) // 1024} KB")

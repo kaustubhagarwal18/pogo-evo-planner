@@ -1,4 +1,5 @@
 """Command-line behaviour: one readable line instead of a traceback, and the options every command shares."""
+
 import contextlib
 import io
 import json
@@ -32,8 +33,11 @@ class CliTests(unittest.TestCase):
     def test_missing_or_broken_files_give_one_line(self):
         """A missing or broken inventory or species file exits with one line naming it, not a traceback."""
         with tempfile.TemporaryDirectory() as d:
-            files = {"bad.json": '{"rare_candy": 1,', "list.json": "[1, 2]",
-                     "no_species.json": '{"pokemon": [{"cp": 10}]}'}
+            files = {
+                "bad.json": '{"rare_candy": 1,',
+                "list.json": "[1, 2]",
+                "no_species.json": '{"pokemon": [{"cp": 10}]}',
+            }
             for name, text in files.items():
                 (Path(d) / name).write_text(text)
             cases = [
@@ -61,8 +65,10 @@ class CliTests(unittest.TestCase):
 
     def test_missing_packages_name_the_install_command(self):
         """Without the scanning or LLM packages, the error names the module and the matching install command."""
-        cases = [("auto", "cv2", "error: reading screens needs the cv2 module", "pip install -e '.[ocr]'"),
-                 ("claude", "anthropic", "error: --ocr claude needs the anthropic module", "pip install -e '.[llm]'")]
+        cases = [
+            ("auto", "cv2", "error: reading screens needs the cv2 module", "pip install -e '.[ocr]'"),
+            ("claude", "anthropic", "error: --ocr claude needs the anthropic module", "pip install -e '.[llm]'"),
+        ]
         for reader, module, what, fix in cases:
             gone = ModuleNotFoundError(f"No module named '{module}'", name=module)
             with self.subTest(reader=reader), mock.patch("pogo_evo_planner.scan.pipeline.scan", side_effect=gone):
@@ -72,9 +78,11 @@ class CliTests(unittest.TestCase):
 
     def test_no_ocr_engine(self):
         """With no OCR engine installed, the scan says how to install one instead of showing a traceback."""
-        with tempfile.TemporaryDirectory() as d, \
-                mock.patch("pogo_evo_planner.scan.ocr.rapidocr_available", return_value=False), \
-                mock.patch("pogo_evo_planner.scan.ocr.tesseract_available", return_value=False):
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch("pogo_evo_planner.scan.ocr.rapidocr_available", return_value=False),
+            mock.patch("pogo_evo_planner.scan.ocr.tesseract_available", return_value=False),
+        ):
             shot = Path(d) / "shot.png"
             cv2.imwrite(str(shot), np.full((40, 40, 3), 255, np.uint8))
             message, _ = run("scan", str(shot), "--species", SAMPLE, "-q", "-o", str(Path(d) / "inv.json"))
@@ -84,11 +92,24 @@ class CliTests(unittest.TestCase):
     def test_evolvenew_has_the_reader_options_of_scan(self):
         """evolvenew takes the same reader options as scan, so the Claude frame cap it mentions can be raised."""
         with mock.patch("pogo_evo_planner.scan.pipeline.scan", side_effect=ValueError("stop")) as scan:
-            message, _ = run("evolvenew", "results.mp4", "--ocr", "claude", "--llm-max-frames", "100",
-                             "--llm-model", "a-model", "--species", SAMPLE, "-q")
+            message, _ = run(
+                "evolvenew",
+                "results.mp4",
+                "--ocr",
+                "claude",
+                "--llm-max-frames",
+                "100",
+                "--llm-model",
+                "a-model",
+                "--species",
+                SAMPLE,
+                "-q",
+            )
         self.assertEqual(message, "error: stop")
-        self.assertEqual({k: scan.call_args.kwargs[k] for k in ("backend", "max_llm_frames", "llm_model")},
-                         {"backend": "claude", "max_llm_frames": 100, "llm_model": "a-model"})
+        self.assertEqual(
+            {k: scan.call_args.kwargs[k] for k in ("backend", "max_llm_frames", "llm_model")},
+            {"backend": "claude", "max_llm_frames": 100, "llm_model": "a-model"},
+        )
 
     def test_plan_names_families_without_a_candy_count(self):
         """The text plan says which families got no Rare Candy because their candy count is unknown."""
@@ -110,12 +131,15 @@ class CliTests(unittest.TestCase):
             message, printed = run("plan", str(inv), "--species", SAMPLE)
             self.assertEqual(message, "")
             self.assertIn("Kirlia -> Gallade", printed)
-            self.assertIn("Gallade: needs Sinnoh Stone", printed)   # the name players know, not the game's id
+            self.assertIn("Gallade: needs Sinnoh Stone", printed)  # the name players know, not the game's id
             self.assertIn("No evolution uses these items, so the plan ignores them: Moon Stone", printed)
             inv.write_text(json.dumps({**kirlia, "items": {"Sinnoh Stone": 1, "ITEM_GEN4_EVOLUTION_STONE": 2}}))
             message, _ = run("plan", str(inv), "--species", SAMPLE)
-        self.assertEqual(message, f'error: {inv} isn\'t a valid inventory file: "items" lists Sinnoh Stone twice, '
-                                  "as Sinnoh Stone and ITEM_GEN4_EVOLUTION_STONE; keep one")
+        self.assertEqual(
+            message,
+            f'error: {inv} isn\'t a valid inventory file: "items" lists Sinnoh Stone twice, '
+            "as Sinnoh Stone and ITEM_GEN4_EVOLUTION_STONE; keep one",
+        )
 
 
 if __name__ == "__main__":

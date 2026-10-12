@@ -1,4 +1,5 @@
 """The browser app: the Python it calls (webapp.py) and the site scripts/build_web.py assembles."""
+
 import contextlib
 import io
 import json
@@ -38,14 +39,21 @@ def ask(planner: WebPlanner, inventory: dict, **options) -> dict:
 
 def tsv(words: list[Word], scale: float = 1.0) -> str:
     """Words as tesseract.js writes them: TSV rows with no header, boxes in the pixels of the image it read."""
-    return "".join(f"5\t1\t1\t1\t1\t{i}\t{round(w.x * scale)}\t{round(w.y * scale)}\t{round(w.w * scale)}\t"
-                   f"{round(w.h * scale)}\t{w.conf * 100:.0f}\t{w.text}\n" for i, w in enumerate(words))
+    return "".join(
+        f"5\t1\t1\t1\t1\t{i}\t{round(w.x * scale)}\t{round(w.y * scale)}\t{round(w.w * scale)}\t"
+        f"{round(w.h * scale)}\t{w.conf * 100:.0f}\t{w.text}\n"
+        for i, w in enumerate(words)
+    )
 
 
 BAG = [Word("Rare", 300, 900, 88, 40, 0.9), Word("Candy", 420, 900, 110, 40, 0.9), Word("x150", 860, 900, 88, 40, 0.9)]
-DRAGONAIR = [Word("Dragonair", 400, 900, 198, 80, 0.9), Word("60", 760, 1240, 44, 40, 0.9),
-             Word("DRATINI", 640, 1320, 154, 40, 0.9), Word("CANDY", 820, 1320, 110, 40, 0.9),
-             Word("EVOLVE", 450, 1760, 132, 40, 0.9)]
+DRAGONAIR = [
+    Word("Dragonair", 400, 900, 198, 80, 0.9),
+    Word("60", 760, 1240, 44, 40, 0.9),
+    Word("DRATINI", 640, 1320, 154, 40, 0.9),
+    Word("CANDY", 820, 1320, 110, 40, 0.9),
+    Word("EVOLVE", 450, 1760, 132, 40, 0.9),
+]
 
 
 def build(out: Path) -> str:
@@ -64,24 +72,30 @@ class WebPlannerTests(unittest.TestCase):
         reply = ask(self.planner, EXAMPLE)
         expected = plan(SPECIES, TIERS, inventory_from_dict(EXAMPLE))
         self.assertEqual(reply["report"], render(expected))
-        self.assertEqual((reply["rare_candy_used"], reply["rare_candy_available"], reply["families"]),
-                         (expected.rare_candy_used, 150, len(expected.families)))
-        self.assertIn('"source": "test"', reply["dashboard"])   # the dashboard says what the plan was built from
+        self.assertEqual(
+            (reply["rare_candy_used"], reply["rare_candy_available"], reply["families"]),
+            (expected.rare_candy_used, 150, len(expected.families)),
+        )
+        self.assertIn('"source": "test"', reply["dashboard"])  # the dashboard says what the plan was built from
         self.assertEqual(reply["unknown"], ["SNORLAX"])
 
     def test_options_reach_the_planner(self):
         """Settings come from the page's options; one left out keeps the planner's default."""
         self.assertEqual(settings_from({}), Settings())
-        self.assertEqual(settings_from({"new_entries_only": True, "dex_bonus": 5, "allow_trade_evolutions": True}),
-                         Settings(dex_bonus=5.0, new_entries_only=True, allow_trade_evolutions=True))
+        self.assertEqual(
+            settings_from({"new_entries_only": True, "dex_bonus": 5, "allow_trade_evolutions": True}),
+            Settings(dex_bonus=5.0, new_entries_only=True, allow_trade_evolutions=True),
+        )
         lots, none = ask(self.planner, EXAMPLE, dex_bonus=1000), ask(self.planner, EXAMPLE, dex_bonus=0)
         self.assertNotEqual(lots["report"], none["report"])
 
     def test_bad_inventory_is_an_error_not_a_crash(self):
         """A count that isn't a number or a Pokémon with no species comes back as one readable line."""
-        for inventory, words in (({"candy": {"DRATINI": "lots"}}, "isn't a valid inventory"),
-                                 ({"pokemon": [{"iv": [1, 2, 3]}]}, "no 'species' field"),
-                                 ({"pokemon": "Dratini"}, "isn't a valid inventory")):
+        for inventory, words in (
+            ({"candy": {"DRATINI": "lots"}}, "isn't a valid inventory"),
+            ({"pokemon": [{"iv": [1, 2, 3]}]}, "no 'species' field"),
+            ({"pokemon": "Dratini"}, "isn't a valid inventory"),
+        ):
             reply = ask(self.planner, inventory)
             self.assertEqual(list(reply), ["error"])
             self.assertIn(words, reply["error"])
@@ -91,8 +105,15 @@ class WebPlannerTests(unittest.TestCase):
         reply = ask(self.planner, {"rare_candy": 100, "pokemon": [{"species": "ONIX"}]})
         self.assertEqual(reply["missing_candy"], ["ONIX"])
         self.assertEqual(reply["missing_items"], {"ITEM_METAL_COAT": [["ONIX", "STEELIX"]]})
-        answered = ask(self.planner, {"rare_candy": 100, "candy": {"ONIX": 0}, "items": {"ITEM_METAL_COAT": 0},
-                                      "pokemon": [{"species": "ONIX"}]})
+        answered = ask(
+            self.planner,
+            {
+                "rare_candy": 100,
+                "candy": {"ONIX": 0},
+                "items": {"ITEM_METAL_COAT": 0},
+                "pokemon": [{"species": "ONIX"}],
+            },
+        )
         self.assertEqual((answered["missing_candy"], answered["missing_items"]), ([], {}))
 
     def test_asks_for_items_further_down_the_line(self):
@@ -113,8 +134,9 @@ class WebPlannerTests(unittest.TestCase):
         """With new entries only (evolvenew), an item for a species already registered isn't asked for; otherwise it is,
         since evolving into a species you don't hold still counts."""
         inv = {"candy": {"RALTS": 300}, "pokedex": ["GALLADE"], "pokemon": [{"species": "KIRLIA"}]}
-        self.assertEqual(ask(self.planner, inv)["missing_items"],
-                         {"ITEM_GEN4_EVOLUTION_STONE": [["KIRLIA", "GALLADE"]]})
+        self.assertEqual(
+            ask(self.planner, inv)["missing_items"], {"ITEM_GEN4_EVOLUTION_STONE": [["KIRLIA", "GALLADE"]]}
+        )
         self.assertEqual(ask(self.planner, inv, new_entries_only=True)["missing_items"], {})
 
     def test_catalog_has_families_and_item_names(self):
@@ -136,12 +158,15 @@ class WebScanTests(unittest.TestCase):
                 cv2.imwrite(str(scanner.folder / name), image)
                 passes = json.loads(scanner.passes_json(name))
                 self.assertEqual([Path(p["path"]).is_file() for p in passes], [True] * 3)
-                kind = json.loads(scanner.read_json(name, json.dumps(
-                    [{"tsv": tsv(words, p["scale"]), "scale": p["scale"]} for p in passes])))["kind"]
+                kind = json.loads(
+                    scanner.read_json(
+                        name, json.dumps([{"tsv": tsv(words, p["scale"]), "scale": p["scale"]} for p in passes])
+                    )
+                )["kind"]
                 self.assertIn(kind, ("bag", "detail"))
-                self.assertFalse(any(scanner.folder.glob(".passes/*")))   # read passes are removed
+                self.assertFalse(any(scanner.folder.glob(".passes/*")))  # read passes are removed
             reply = json.loads(scanner.finish_json(evolvenew))
-            self.assertFalse(scanner.folder.exists())   # the scan's folder goes when it finishes
+            self.assertFalse(scanner.folder.exists())  # the scan's folder goes when it finishes
         return reply
 
     def test_screenshots_become_an_inventory(self):
@@ -169,8 +194,9 @@ class WebScanTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             scanner = self.planner.scanner(str(Path(tmp) / "scan"))
             (scanner.folder / "notes.png").write_text("not a picture", encoding="utf-8")
-            self.assertEqual(json.loads(scanner.passes_json("notes.png")),
-                             {"error": "notes.png isn't a PNG or JPEG screenshot"})
+            self.assertEqual(
+                json.loads(scanner.passes_json("notes.png")), {"error": "notes.png isn't a PNG or JPEG screenshot"}
+            )
 
 
 class SiteBuildTests(unittest.TestCase):
@@ -205,15 +231,22 @@ class SiteBuildTests(unittest.TestCase):
             build(Path(tmp) / "site")
             with zipfile.ZipFile(Path(tmp) / "site" / "planner.zip") as z:
                 z.extractall(Path(tmp) / "py")
-            code = ("import json, sys\n"
-                    "sys.path.insert(0, '.')\n"
-                    "from pogo_evo_planner.webapp import WebPlanner\n"
-                    f"w = WebPlanner(open({str(Path(tmp) / 'site' / 'species.json')!r}).read())\n"
-                    f"print(json.loads(w.plan_json(json.dumps({{'inventory': {EXAMPLE!r}}})))['rare_candy_used'])\n"
-                    "print(sorted(m for m in sys.modules if m.split('.')[0] in ('cv2', 'numpy', 'rapidocr')))\n")
+            code = (
+                "import json, sys\n"
+                "sys.path.insert(0, '.')\n"
+                "from pogo_evo_planner.webapp import WebPlanner\n"
+                f"w = WebPlanner(open({str(Path(tmp) / 'site' / 'species.json')!r}).read())\n"
+                f"print(json.loads(w.plan_json(json.dumps({{'inventory': {EXAMPLE!r}}})))['rare_candy_used'])\n"
+                "print(sorted(m for m in sys.modules if m.split('.')[0] in ('cv2', 'numpy', 'rapidocr')))\n"
+            )
             # -S: no site-packages, so an import of anything outside the standard library fails here
-            done = subprocess.run([sys.executable, "-S", "-c", code], cwd=Path(tmp) / "py",  # nosec B603
-                                  capture_output=True, text=True, check=False)
+            done = subprocess.run(
+                [sys.executable, "-S", "-c", code],
+                cwd=Path(tmp) / "py",  # nosec B603
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             self.assertEqual(done.returncode, 0, done.stderr)
             used, extras = done.stdout.splitlines()
             self.assertEqual(int(used), plan(SPECIES, TIERS, inventory_from_dict(EXAMPLE)).rare_candy_used)

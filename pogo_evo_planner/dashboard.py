@@ -1,4 +1,5 @@
 """Render a plan as a single self-contained HTML dashboard."""
+
 from __future__ import annotations
 
 import json
@@ -21,24 +22,45 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
         paths = []
         for path in f.paths:
             if path.steps:
-                planned[(path.specimen.species, path.specimen.label)] = \
+                planned[(path.specimen.species, path.specimen.label)] = (
                     "Evolve to " + path.steps[-1].to.replace("_", " ").title()
-            paths.append({
-                "species": path.specimen.species, "label": path.specimen.label, "candy": path.candy,
-                "steps": [{"frm": s.frm, "to": s.to, "candy": s.candy,
-                           "item": item_name(s.item) if s.item else None, "notes": list(s.notes),
-                           "new_dex": s.to not in registered} for s in path.steps],
-            })
-        families.append({
-            "family": f.family, "candy_used": f.candy_used, "candy_owned": f.candy_owned,
-            "rare_candy": f.rare_candy, "value": f.value, "km_saved": f.km_saved,
-            "value_per_candy": f.value / f.candy_used if f.candy_used else 0.0, "paths": paths,
-        })
+                )
+            paths.append(
+                {
+                    "species": path.specimen.species,
+                    "label": path.specimen.label,
+                    "candy": path.candy,
+                    "steps": [
+                        {
+                            "frm": s.frm,
+                            "to": s.to,
+                            "candy": s.candy,
+                            "item": item_name(s.item) if s.item else None,
+                            "notes": list(s.notes),
+                            "new_dex": s.to not in registered,
+                        }
+                        for s in path.steps
+                    ],
+                }
+            )
+        families.append(
+            {
+                "family": f.family,
+                "candy_used": f.candy_used,
+                "candy_owned": f.candy_owned,
+                "rare_candy": f.rare_candy,
+                "value": f.value,
+                "km_saved": f.km_saved,
+                "value_per_candy": f.value / f.candy_used if f.candy_used else 0.0,
+                "paths": paths,
+            }
+        )
     trade = []
     for spec, step in p.trade_instead:
         planned.setdefault((spec.species, spec.label), "Trade for " + step.to.replace("_", " ").title())
-        trade.append({"species": spec.species, "label": spec.label, "frm": step.frm, "to": step.to,
-                      "candy": step.candy})
+        trade.append(
+            {"species": spec.species, "label": spec.label, "frm": step.frm, "to": step.to, "candy": step.candy}
+        )
 
     evolving = {species for species, _ in planned}
 
@@ -47,20 +69,25 @@ def build_view(p: Plan, inv: Inventory, species: dict, source: str = "") -> dict
         if (sp.species, sp.label) in planned:
             return planned[(sp.species, sp.label)]
         if sp.species in evolving:
-            return "Another one is evolved"   # an extra copy, not something the plan left out
+            return "Another one is evolved"  # an extra copy, not something the plan left out
         if sp.species in inv.not_caught:
             return "Probably misread: an Evolve button shows it as never caught"
         if sp.species not in species:
             return "Not in species data"
         return "Not planned" if species[sp.species].get("evolutions") else "Fully evolved"
 
-    shown = {sp.species for sp in inv.pokemon} | {s for f in families for path in f["paths"]
-                                                  for s in [path["species"]] + [st["to"] for st in path["steps"]]}
+    shown = {sp.species for sp in inv.pokemon} | {
+        s for f in families for path in f["paths"] for s in [path["species"]] + [st["to"] for st in path["steps"]]
+    }
     shown |= {s for t in trade for s in (t["frm"], t["to"])}
     return {
         "source": source,
-        "available": p.rare_candy_available, "used": p.rare_candy_used, "total_value": p.total_value,
-        "families": families, "trade": trade, "unknown": p.unknown_species,
+        "available": p.rare_candy_available,
+        "used": p.rare_candy_used,
+        "total_value": p.total_value,
+        "families": families,
+        "trade": trade,
+        "unknown": p.unknown_species,
         "unknown_items": p.unknown_items,
         "missing_candy": families_missing_candy(inv, species),
         "pokemon": [{"species": s.species, "label": s.label, "status": status(s)} for s in inv.pokemon],

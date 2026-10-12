@@ -1,4 +1,5 @@
 """The LLM scanning backends (Claude, Ollama) with fake clients: no network, no API key, no cost."""
+
 import socket
 import tempfile
 import unittest
@@ -23,8 +24,16 @@ SPECIES = load_species(ROOT / "pogo_evo_planner/data/species_sample.json")
 
 def reading(**fields):
     """A ScreenReading with every field empty except the ones given."""
-    base = {"kind": "other", "rare_candy": None, "species": None, "candy_name": None, "candy": None,
-            "evolve_sprite": "none", "specimens": [], "pokedex": []}
+    base = {
+        "kind": "other",
+        "rare_candy": None,
+        "species": None,
+        "candy_name": None,
+        "candy": None,
+        "evolve_sprite": "none",
+        "specimens": [],
+        "pokedex": [],
+    }
     return llm.ScreenReading.model_validate({**base, **fields})
 
 
@@ -104,8 +113,10 @@ class ClaudeScanTests(unittest.TestCase):
 
     def test_values_still_failing_after_the_retry_are_dropped(self):
         """Values still failing after the retry are dropped, each with a note; the rest is kept."""
-        bad = reading(kind="storage", specimens=[{"name": "Dratini", "cp": 500}, {"name": "Notamon", "cp": 500},
-                                                 {"name": "Feebas", "cp": 99999}])
+        bad = reading(
+            kind="storage",
+            specimens=[{"name": "Dratini", "cp": 500}, {"name": "Notamon", "cp": 500}, {"name": "Feebas", "cp": 99999}],
+        )
         res, notes = self.read(FakeClient(bad, bad))
         self.assertEqual(res.specimens, [("DRATINI", 500)])
         self.assertEqual(len(notes), 2)
@@ -115,19 +126,22 @@ class ClaudeScanTests(unittest.TestCase):
 
     def test_detail_page_candy_and_evolve_button(self):
         """A detail reading gives family candy and, for a single evolution, its caught status."""
-        res, _ = self.read(FakeClient(reading(kind="detail", species="Dratini", candy_name="DRATINI", candy=60,
-                                              evolve_sprite="silhouette")))
+        res, _ = self.read(
+            FakeClient(
+                reading(kind="detail", species="Dratini", candy_name="DRATINI", candy=60, evolve_sprite="silhouette")
+            )
+        )
         self.assertEqual(res.candy, {"DRATINI": 60})
         self.assertEqual(res.dex_not_caught, {"DRAGONAIR"})
-        res, _ = self.read(FakeClient(reading(kind="detail", species="Eevee", candy_name="EEVEE", candy=30,
-                                              evolve_sprite="colour")))
+        res, _ = self.read(
+            FakeClient(reading(kind="detail", species="Eevee", candy_name="EEVEE", candy=30, evolve_sprite="colour"))
+        )
         # branched line: several Evolve buttons, so the sprite can't be pinned to one species
         self.assertEqual((res.dex_caught, res.dex_not_caught), (set(), set()))
 
     def test_pokedex_entries(self):
         """Pokédex entries become caught or seen only; an unknown dex number is dropped with a note."""
-        entries = [{"number": 147, "caught": True}, {"number": 148, "caught": False},
-                   {"number": 99999, "caught": True}]
+        entries = [{"number": 147, "caught": True}, {"number": 148, "caught": False}, {"number": 99999, "caught": True}]
         res, notes = self.read(FakeClient(*[reading(kind="pokedex", pokedex=entries)] * 2))
         self.assertEqual((res.dex_caught, res.dex_seen_only), ({"DRATINI"}, {"DRAGONAIR"}))
         self.assertEqual(len(notes), 1)
@@ -140,9 +154,11 @@ class ClaudeScanTests(unittest.TestCase):
 
     def test_missing_credentials_is_a_clear_error(self):
         """No Claude credentials gives a one-line error naming ANTHROPIC_API_KEY, not a traceback."""
+
         def no_auth(**_):
             """Fail the way the SDK does when no credentials are configured."""
             raise TypeError('"Could not resolve authentication method. Expected one of api_key ..."')
+
         client = SimpleNamespace(beta=SimpleNamespace(messages=SimpleNamespace(parse=no_auth)))
         with self.assertRaisesRegex(ValueError, "ANTHROPIC_API_KEY"):
             llm.read_screens([("a", IMG)], self.m, SPECIES, llm.Claude(client=client))
@@ -170,8 +186,13 @@ class ClaudeScanTests(unittest.TestCase):
         model = llm.Claude(client=FakeClient(reading(kind="bag", rare_candy=7), reading(kind="storage", specimens=[])))
         model.workers = 1  # so the fake client's queue order is the frame order
         seen = []
-        results = llm.read_screens([("a", IMG), ("b", IMG)], self.m, SPECIES, model,
-                                   progress=lambda i, n, label, kind: seen.append((label, kind)))
+        results = llm.read_screens(
+            [("a", IMG), ("b", IMG)],
+            self.m,
+            SPECIES,
+            model,
+            progress=lambda i, n, label, kind: seen.append((label, kind)),
+        )
         self.assertEqual([r.kind for r in results], ["bag", "storage"])
         self.assertEqual(seen, [("a", "bag"), ("b", "storage")])
 

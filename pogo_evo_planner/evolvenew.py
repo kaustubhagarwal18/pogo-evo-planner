@@ -11,6 +11,7 @@ Candy count, and gets the plan:
 - a Pokémon with no candy evolution is only listed for its Mega Evolution, which uses Mega Energy and
   isn't planned.
 """
+
 from __future__ import annotations
 
 import shlex
@@ -25,9 +26,10 @@ from .planner import Plan
 @dataclass
 class Listing:
     """What the `evolvenew` Pokémon tell us, beyond the inventory itself."""
-    mega_only: list[str] = field(default_factory=list)       # final forms: listed for their Mega
+
+    mega_only: list[str] = field(default_factory=list)  # final forms: listed for their Mega
     already_caught: list[str] = field(default_factory=list)  # evolutions whose sprite shows caught
-    already_held: list[str] = field(default_factory=list)    # evolutions you already have one of
+    already_held: list[str] = field(default_factory=list)  # evolutions you already have one of
     notes: list[str] = field(default_factory=list)
 
 
@@ -38,7 +40,7 @@ def apply_evolvenew(inv: dict, species: dict) -> tuple[dict, Listing]:
     """
     out = {**inv, "not_caught": list(inv.get("not_caught", [])), "pokedex": list(inv.get("pokedex", []))}
     held = {p["species"] for p in inv.get("pokemon", [])}
-    caught, never = set(out["pokedex"]) | held, set(out["not_caught"]) - held   # you can't miss what you hold
+    caught, never = set(out["pokedex"]) | held, set(out["not_caught"]) - held  # you can't miss what you hold
     listing = Listing()
     for sp in sorted({p["species"] for p in inv.get("pokemon", []) if p["species"] in species}):
         targets = [e["to"] for e in species[sp].get("evolutions", [])]
@@ -49,8 +51,9 @@ def apply_evolvenew(inv: dict, species: dict) -> tuple[dict, Listing]:
         listing.already_held += [t for t in targets if t in held]
         listing.already_caught += [t for t in targets if t in caught and t not in held]
         if len(targets) > 1 and len(new) < len(targets):
-            listing.notes.append(f"{_name(sp)}: only {', '.join(map(_name, new)) or 'none'} of its evolutions "
-                                 "can be new")
+            listing.notes.append(
+                f"{_name(sp)}: only {', '.join(map(_name, new)) or 'none'} of its evolutions can be new"
+            )
         never |= set(new)
     out["not_caught"] = sorted(never)
     return out, listing
@@ -92,8 +95,9 @@ def _label(sp: str, inv: Inventory, species: dict) -> str:
     """A missing species as players know it: forms of one Pokédex entry are named once, with the forms."""
     base = next((k for k, v in species.items() if v.get("dex") == _dex(sp, species) and "_" not in k), None)
     # forms in the species table's order (Two before Three), leaving out the plain base name
-    forms = [k for k in species if k != base and _dex(k, species) == _dex(sp, species)
-             and (k == sp or k in inv.not_caught)]
+    forms = [
+        k for k in species if k != base and _dex(k, species) == _dex(sp, species) and (k == sp or k in inv.not_caught)
+    ]
     if len(forms) < 2 or base is None:
         return _name(sp)
     return f"{_name(base)} ({' or '.join(_name(f).removeprefix(_name(base)).strip() for f in forms)})"
@@ -106,12 +110,14 @@ def _evolution(frm: str, to: str, species: dict) -> dict:
 
 def unknown_candy(inv: Inventory, species: dict) -> frozenset[str]:
     """Families with a missing species to evolve into but no candy count: never spend Rare Candy on them."""
-    return frozenset(species[frm]["family"] for _, frm, _ in missing(inv, species)[0]
-                     if species[frm]["family"] not in inv.candy)
+    return frozenset(
+        species[frm]["family"] for _, frm, _ in missing(inv, species)[0] if species[frm]["family"] not in inv.candy
+    )
 
 
-def render(p: Plan, inv: Inventory, species: dict, listing: Listing,
-           show_missing: bool = True, show_plan: bool = True) -> str:
+def render(
+    p: Plan, inv: Inventory, species: dict, listing: Listing, show_missing: bool = True, show_plan: bool = True
+) -> str:
     """Which species you're missing, then the plan in plain words: evolve now, use Rare Candy, not yet.
 
     The command asks for missing candy counts in between, so it prints the two parts separately;
@@ -138,11 +144,13 @@ def _render_missing(inv: Inventory, species: dict, listing: Listing) -> list[str
             out.append(f"  {_label(to, inv, species):{width}}from {_name(frm):14} {cost:4} candy, {candy}{needs}")
         out.append("")
     if catch:
-        out += ["Catch these (seen, but nothing you own evolves into them):",
-                "  " + ", ".join(map(_name, catch)), ""]
+        out += ["Catch these (seen, but nothing you own evolves into them):", "  " + ", ".join(map(_name, catch)), ""]
     if listing.mega_only:
-        out += [f"Mega Evolution only ({len(listing.mega_only)}, need Mega Energy, not planned):",
-                "  " + ", ".join(map(_name, listing.mega_only)), ""]
+        out += [
+            f"Mega Evolution only ({len(listing.mega_only)}, need Mega Energy, not planned):",
+            "  " + ", ".join(map(_name, listing.mega_only)),
+            "",
+        ]
     return out
 
 
@@ -161,9 +169,12 @@ def _render_plan(p: Plan, inv: Inventory, species: dict) -> list[str]:
             lines.append(f"  {chain}{_needs([(s.item, list(s.notes)) for s in path.steps])}")
         if not f.rare_candy:
             now += lines
-        elif len(lines) == 1:   # Rare Candy is per family: inline for one evolution, a total for several
-            rare.append(lines[0].replace(" (", f"  +{f.rare_candy} Rare Candy (", 1) if " (" in lines[0]
-                        else f"{lines[0]}  +{f.rare_candy} Rare Candy")
+        elif len(lines) == 1:  # Rare Candy is per family: inline for one evolution, a total for several
+            rare.append(
+                lines[0].replace(" (", f"  +{f.rare_candy} Rare Candy (", 1)
+                if " (" in lines[0]
+                else f"{lines[0]}  +{f.rare_candy} Rare Candy"
+            )
         else:
             rare += lines + [f"    +{f.rare_candy} Rare Candy for the {_name(f.family)} family"]
     later = _not_yet(inv, species, planned, p)
@@ -172,15 +183,23 @@ def _render_plan(p: Plan, inv: Inventory, species: dict) -> list[str]:
         if rows:
             out += [title, *rows, ""]
     if p.trade_instead:
-        out += ["Free by trading:",
-                *sorted({f"  {_name(s.frm)} → {_name(s.to)}" for _, s in p.trade_instead}), ""]
-    unknown = sorted({(species[frm]["family"], frm) for _, frm, _ in missing(inv, species)[0]
-                      if species[frm]["family"] not in inv.candy})
+        out += ["Free by trading:", *sorted({f"  {_name(s.frm)} → {_name(s.to)}" for _, s in p.trade_instead}), ""]
+    unknown = sorted(
+        {
+            (species[frm]["family"], frm)
+            for _, frm, _ in missing(inv, species)[0]
+            if species[frm]["family"] not in inv.candy
+        }
+    )
     if unknown:
-        out += [(f"To plan your {p.rare_candy_available} Rare Candy for the rest, add each family's candy count: "
-                 "screenshot one Pokémon's page per family, or use --candy NAME=N:"),
-                "  " + ", ".join(f"{_name(fam)} (e.g. {_name(frm)})" if fam != frm else _name(fam)
-                                 for fam, frm in unknown), ""]
+        out += [
+            (
+                f"To plan your {p.rare_candy_available} Rare Candy for the rest, add each family's candy count: "
+                "screenshot one Pokémon's page per family, or use --candy NAME=N:"
+            ),
+            "  " + ", ".join(f"{_name(fam)} (e.g. {_name(frm)})" if fam != frm else _name(fam) for fam, frm in unknown),
+            "",
+        ]
     return out
 
 
@@ -188,11 +207,17 @@ def _render_notes(listing: Listing) -> list[str]:
     """Closing notes: evolutions listed but already held or caught, and branch notes."""
     out = []
     if listing.already_held:
-        out += ["Listed by evolvenew, but you already have one (maybe a different form or costume):",
-                "  " + ", ".join(map(_name, sorted(set(listing.already_held)))), ""]
+        out += [
+            "Listed by evolvenew, but you already have one (maybe a different form or costume):",
+            "  " + ", ".join(map(_name, sorted(set(listing.already_held)))),
+            "",
+        ]
     if listing.already_caught:
-        out += ["Already caught according to the Evolve button (not new):",
-                "  " + ", ".join(map(_name, sorted(set(listing.already_caught)))), ""]
+        out += [
+            "Already caught according to the Evolve button (not new):",
+            "  " + ", ".join(map(_name, sorted(set(listing.already_caught)))),
+            "",
+        ]
     return out + [f"Note: {n}" for n in listing.notes]
 
 
@@ -201,36 +226,49 @@ def _not_yet(inv: Inventory, species: dict, planned: set[str], p: Plan) -> list[
     already planned. Unknown candy counts are listed separately, as the next thing to add."""
     rows = []
     trade = {s.to for _, s in p.trade_instead}
-    planned_entries = {_dex(t, species) for t in planned}   # one form of a Pokédex entry is enough
+    planned_entries = {_dex(t, species) for t in planned}  # one form of a Pokédex entry is enough
     copies = {sp: sum(s.species == sp for s in inv.pokemon) for sp in {s.species for s in inv.pokemon}}
-    taken = {sp: sum(path.specimen.species == sp for f in p.families for path in f.paths if path.steps)
-             for sp in copies}
+    taken = {
+        sp: sum(path.specimen.species == sp for f in p.families for path in f.paths if path.steps) for sp in copies
+    }
     for sp in sorted(copies):
         fam = species.get(sp, {}).get("family")
         for e in species.get(sp, {}).get("evolutions", []):
             to = e["to"]
-            if to in planned or _dex(to, species) in planned_entries or to in trade or to not in inv.not_caught \
-                    or to in copies:
+            if (
+                to in planned
+                or _dex(to, species) in planned_entries
+                or to in trade
+                or to not in inv.not_caught
+                or to in copies
+            ):
                 continue
             have, cost = inv.candy.get(fam), int(e["candy"])
             if have is None:
                 continue
             if e.get("item") and inv.items.get(e["item"], 0) < 1:
-                why = f"needs {item_name(e['item'])}: if you have one, add --item \"{item_name(e['item'])}=N\""
+                why = f'needs {item_name(e["item"])}: if you have one, add --item "{item_name(e["item"])}=N"'
             elif have < cost:
                 why = f"{cost - have} candy short (have {have} of {cost})"
             elif taken[sp] >= copies[sp]:
                 n = copies[sp]
-                why = (f"your {n} {_name(sp)} {'is' if n == 1 else 'are'} planned above; if you have another, "
-                       f"add a screenshot of its page")
+                why = (
+                    f"your {n} {_name(sp)} {'is' if n == 1 else 'are'} planned above; if you have another, "
+                    f"add a screenshot of its page"
+                )
             else:
                 why = "its candy is used by the picks above"
             rows.append(f"  {_name(sp)} → {_name(to)}: {why}{_needs([(None, e.get('notes', []))])}")
     return rows
 
 
-def ask_for_candy(inv: Inventory, species: dict, ask: Callable[[str], str],
-                  read: Callable[[list[str]], dict[str, int]], say: Callable[[str], None]) -> dict[str, int]:
+def ask_for_candy(
+    inv: Inventory,
+    species: dict,
+    ask: Callable[[str], str],
+    read: Callable[[list[str]], dict[str, int]],
+    say: Callable[[str], None],
+) -> dict[str, int]:
     """Ask for each missing candy count: a number, a screenshot of that Pokémon's page, or Enter to skip.
 
     ask prompts and returns the answer (input), read OCRs screenshots into {family: candy}, say shows a
@@ -244,17 +282,19 @@ def ask_for_candy(inv: Inventory, species: dict, ask: Callable[[str], str],
     if not wanted:
         return {}
     n = len(wanted)
-    say(f"{n} {'family needs' if n == 1 else 'families need'} a candy count. For each, type the number, or the "
+    say(
+        f"{n} {'family needs' if n == 1 else 'families need'} a candy count. For each, type the number, or the "
         "path of a screenshot "
-        "of that Pokémon's page (you can drag the file in), or press Enter to skip; q stops.")
+        "of that Pokémon's page (you can drag the file in), or press Enter to skip; q stops."
+    )
     answers: dict[str, int] = {}
     for fam, uses in wanted.items():
-        if fam in answers:   # already read from an earlier screenshot
+        if fam in answers:  # already read from an earlier screenshot
             continue
         for _ in range(3):
             try:
                 reply = ask(f"{_name(fam)} candy ({'; '.join(uses)}): ").strip()
-            except EOFError:   # Ctrl-D, or input ran out: plan with what was given
+            except EOFError:  # Ctrl-D, or input ran out: plan with what was given
                 return answers
             if not reply:
                 break
@@ -268,7 +308,7 @@ def ask_for_candy(inv: Inventory, species: dict, ask: Callable[[str], str],
             except (ValueError, OSError) as e:
                 say(f"  couldn't read that: {e}")
                 continue
-            answers.update({f: n for f, n in read_counts.items() if f in wanted})   # any family it shows
+            answers.update({f: n for f, n in read_counts.items() if f in wanted})  # any family it shows
             if fam in read_counts:
                 say(f"  read {read_counts[fam]}")
                 break
@@ -286,8 +326,9 @@ def items_needed(inv: Inventory, species: dict) -> dict[str, list[str]]:
     return wanted
 
 
-def ask_for_items(inv: Inventory, species: dict, ask: Callable[[str], str],
-                  say: Callable[[str], None]) -> dict[str, int]:
+def ask_for_items(
+    inv: Inventory, species: dict, ask: Callable[[str], str], say: Callable[[str], None]
+) -> dict[str, int]:
     """Ask how many of each needed evolution item (apples, Sinnoh Stone, lures...) the player has.
 
     Enter means none; "q" or the end of input (Ctrl-D) stops asking. Returns {item id: count}.
@@ -296,8 +337,10 @@ def ask_for_items(inv: Inventory, species: dict, ask: Callable[[str], str],
     if not wanted:
         return {}
     n = len(wanted)
-    say(f"{n} evolution {'item is' if n == 1 else 'items are'} needed. For each, type how many you have "
-        "(Enter if none; q stops).")
+    say(
+        f"{n} evolution {'item is' if n == 1 else 'items are'} needed. For each, type how many you have "
+        "(Enter if none; q stops)."
+    )
     answers: dict[str, int] = {}
     for item, uses in wanted.items():
         for _ in range(3):
@@ -337,6 +380,6 @@ def item_overrides(pairs: list[str], species: dict) -> dict[str, int]:
         name, sep, count = pair.rpartition("=")
         item = item_id(name, known) if sep else None
         if item is None or not count.strip().isdigit():
-            raise ValueError(f"--item {pair!r}: expected an evolution item and a count, like \"Tart Apple=26\"")
+            raise ValueError(f'--item {pair!r}: expected an evolution item and a count, like "Tart Apple=26"')
         out[item] = int(count)
     return out

@@ -6,6 +6,7 @@ WebAssembly). Planning only uses the standard library; WebScan also needs NumPy 
 the page loads only when screenshots are read, so it imports them lazily. Requests and replies are
 JSON strings, which cross between JavaScript and Python without any conversion.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,10 +25,12 @@ TIERS = Path(__file__).resolve().parent / "data" / "rarity_tiers.json"
 def settings_from(options: dict) -> Settings:
     """Planner settings from the page's options; any option left out keeps its default."""
     d = Settings()
-    return Settings(dex_bonus=float(options.get("dex_bonus", d.dex_bonus)),
-                    repeat_value=float(options.get("repeat_value", d.repeat_value)),
-                    allow_trade_evolutions=bool(options.get("allow_trade_evolutions", d.allow_trade_evolutions)),
-                    new_entries_only=bool(options.get("new_entries_only", d.new_entries_only)))
+    return Settings(
+        dex_bonus=float(options.get("dex_bonus", d.dex_bonus)),
+        repeat_value=float(options.get("repeat_value", d.repeat_value)),
+        allow_trade_evolutions=bool(options.get("allow_trade_evolutions", d.allow_trade_evolutions)),
+        new_entries_only=bool(options.get("new_entries_only", d.new_entries_only)),
+    )
 
 
 def items_to_ask(inv: Inventory, species: dict, settings: Settings) -> dict[str, list[list[str]]]:
@@ -73,19 +76,21 @@ class WebPlanner:
             settings = settings_from(req.get("options") or {})
         except KeyError as e:
             return json.dumps({"error": f"This isn't a valid inventory: an entry has no {e} field."})
-        except (ValueError, TypeError, AttributeError) as e:   # a count that isn't a number, a list that isn't one
+        except (ValueError, TypeError, AttributeError) as e:  # a count that isn't a number, a list that isn't one
             return json.dumps({"error": f"This isn't a valid inventory: {e}"})
         result = plan(self.species, self.tiers, inv, settings)
-        return json.dumps({
-            "report": render(result),
-            "dashboard": render_html(build_view(result, inv, self.species, req.get("source", ""))),
-            "rare_candy_used": result.rare_candy_used,
-            "rare_candy_available": result.rare_candy_available,
-            "families": len(result.families),
-            "missing_candy": families_missing_candy(inv, self.species),
-            "missing_items": items_to_ask(inv, self.species, settings),
-            "unknown": result.unknown_species,
-        })
+        return json.dumps(
+            {
+                "report": render(result),
+                "dashboard": render_html(build_view(result, inv, self.species, req.get("source", ""))),
+                "rare_candy_used": result.rare_candy_used,
+                "rare_candy_available": result.rare_candy_available,
+                "families": len(result.families),
+                "missing_candy": families_missing_candy(inv, self.species),
+                "missing_items": items_to_ask(inv, self.species, settings),
+                "unknown": result.unknown_species,
+            }
+        )
 
     def scanner(self, folder: str) -> WebScan:
         """A new scan of the screenshots the page writes into folder, with this species table."""
@@ -114,6 +119,7 @@ class WebScan:
         import cv2
 
         from .scan.ocr import tesseract_passes
+
         img = cv2.imread(str(self.folder / name))
         if img is None:
             return json.dumps({"error": f"{name} isn't a PNG or JPEG screenshot"})
@@ -129,6 +135,7 @@ class WebScan:
         kind of screen it is, as {"kind": "bag" | "detail" | "pokedex" | "storage" | "unknown"}."""
         from .scan.ocr import merge_passes, words_from_tsv
         from .scan.screens import classify
+
         self.words[name] = merge_passes([words_from_tsv(p["tsv"], p["scale"]) for p in json.loads(tsvs)])
         for path in (self.folder / ".passes").glob(f"{name}.*.png"):
             path.unlink()
@@ -142,12 +149,18 @@ class WebScan:
         questions, so their warnings are left out."""
         from .evolvenew import apply_evolvenew
         from .scan.pipeline import scan
-        inv, report = scan([self.folder / name for name in self.words], self.species,
-                           read_text=lambda label, _img: self.words[label])
+
+        inv, report = scan(
+            [self.folder / name for name in self.words], self.species, read_text=lambda label, _img: self.words[label]
+        )
         shutil.rmtree(self.folder, ignore_errors=True)
-        reply = {"screens": dict(report.screens), "bag": report.screens["bag"] > 0, "listed": report.listed,
-                 "grid": report.grid,
-                 "warnings": [w for w in report.warnings if not w.startswith(("no candy count for", "no item bag"))]}
+        reply = {
+            "screens": dict(report.screens),
+            "bag": report.screens["bag"] > 0,
+            "listed": report.listed,
+            "grid": report.grid,
+            "warnings": [w for w in report.warnings if not w.startswith(("no candy count for", "no item bag"))],
+        }
         if evolvenew:
             inv, listing = apply_evolvenew(inv, self.species)
             reply.update(mega_only=listing.mega_only, already_caught=listing.already_caught, notes=listing.notes)

@@ -10,6 +10,7 @@ Everything is located relative to text the game always shows rather than
 fixed pixel regions, so different phone sizes should mostly work. The
 thresholds still need calibrating against real screenshots.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -30,7 +31,7 @@ except ImportError:
 _NUM = re.compile(r"^[x×X*]?(\d{1,3}(?:[,.]\d{3})+|\d+)$")
 _CP_JOINED = re.compile(r"^CP(\d{2,5})$", re.IGNORECASE)
 _DEX_NUM = re.compile(r"^(?:#|No\.?)?0*(\d{1,4})$")
-_LISTED = re.compile(r"\((\d{1,4})\)$")   # "(210)" under the POKÉMON tab; OCR reads the search icon as "Q"
+_LISTED = re.compile(r"\((\d{1,4})\)$")  # "(210)" under the POKÉMON tab; OCR reads the search icon as "Q"
 
 
 def norm(s: str) -> str:
@@ -77,18 +78,19 @@ class SpeciesMatcher:
 @dataclass
 class ScreenResult:
     kind: str
-    species: str | None = None                                   # detail: the Pokémon the page shows
+    species: str | None = None  # detail: the Pokémon the page shows
     rare_candy: int | None = None
-    candy: dict[str, int] = field(default_factory=dict)          # family -> count
+    candy: dict[str, int] = field(default_factory=dict)  # family -> count
     specimens: list[tuple[str, int | None]] = field(default_factory=list)  # (species, cp)
     dex_caught: set[str] = field(default_factory=set)
     dex_seen_only: set[str] = field(default_factory=set)
-    dex_not_caught: set[str] = field(default_factory=set)      # evolve button shows a silhouette
-    listed: int | None = None                                    # storage: how many Pokémon a search found
+    dex_not_caught: set[str] = field(default_factory=set)  # evolve button shows a silhouette
+    listed: int | None = None  # storage: how many Pokémon a search found
     notes: list[str] = field(default_factory=list)
 
 
 # ---------- geometry helpers ----------
+
 
 def _same_line(a: Word, b: Word) -> bool:
     """True when two words' vertical centres are close enough to be on one text line."""
@@ -113,7 +115,7 @@ def _phrases(words: list[Word], max_len: int = 2):
     for line in _lines(words):
         for i in range(len(line)):
             for n in range(1, max_len + 1):
-                run = line[i:i + n]
+                run = line[i : i + n]
                 if len(run) < n:
                     break
                 if n > 1 and run[-1].x - (run[-2].x + run[-2].w) > 2.5 * run[-1].h:
@@ -154,6 +156,7 @@ def _xl_below(words: list[Word], anchor: list[Word]) -> bool:
 
 # ---------- classification ----------
 
+
 def classify(words: list[Word]) -> str:
     """Name the screen type from its words: bag, detail, pokedex, storage or unknown."""
     up = [norm(w.text) for w in words]
@@ -172,6 +175,7 @@ def classify(words: list[Word]) -> str:
 
 # ---------- parsers ----------
 
+
 def parse_bag(words: list[Word]) -> ScreenResult:
     """Read the Rare Candy count from an item bag screen, ignoring Rare Candy XL."""
     r = ScreenResult("bag")
@@ -181,15 +185,18 @@ def parse_bag(words: list[Word]) -> ScreenResult:
             if ups[i] == "RARE" and ups[i + 1] == "CANDY":
                 if i + 2 < len(ups) and ups[i + 2] == "XL":
                     continue
-                anchor = line[i:i + 2]
+                anchor = line[i : i + 2]
                 # count: right of the label on the same line, else nearest number above/below
-                right = [parse_int(w.text) for w in line[i + 2:] if parse_int(w.text) is not None]
+                right = [parse_int(w.text) for w in line[i + 2 :] if parse_int(w.text) is not None]
                 if right:
                     r.rare_candy = right[0]
                 else:
                     x0, y0, x1, y1 = _span(anchor)
-                    cands = [(min(abs(w.cy - y0), abs(w.cy - y1)) + abs(w.cx - (x0 + x1) / 2), parse_int(w.text))
-                             for w in words if parse_int(w.text) is not None]
+                    cands = [
+                        (min(abs(w.cy - y0), abs(w.cy - y1)) + abs(w.cx - (x0 + x1) / 2), parse_int(w.text))
+                        for w in words
+                        if parse_int(w.text) is not None
+                    ]
                     if cands:
                         r.rare_candy = min(cands)[1]
     if r.rare_candy is None:
@@ -206,8 +213,10 @@ def evolve_sprite_caught(img: np.ndarray, evolve: Word) -> bool | None:
     no sprite to judge, e.g. a frame where it hasn't loaded yet.
     """
     h = evolve.h
-    box = img[max(0, int(evolve.cy - 1.4 * h)):int(evolve.cy + 1.4 * h),
-              max(0, int(evolve.x - 0.8 * evolve.w)):int(evolve.x - 0.05 * evolve.w)]
+    box = img[
+        max(0, int(evolve.cy - 1.4 * h)) : int(evolve.cy + 1.4 * h),
+        max(0, int(evolve.x - 0.8 * evolve.w)) : int(evolve.x - 0.05 * evolve.w),
+    ]
     if box.size == 0:
         return None
     lab = cv2.cvtColor(box, cv2.COLOR_BGR2LAB).astype(float)
@@ -231,7 +240,7 @@ def evolve_sprite_caught(img: np.ndarray, evolve: Word) -> bool | None:
     if sprite.sum() < 100:
         return None  # no sprite yet (still loading, under 20 px on real frames), or too small to judge
     core = cv2.erode(sprite.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
-    px = lab[core] if core.sum() > 50 else lab[sprite]   # without the anti-aliased rim
+    px = lab[core] if core.sum() > 50 else lab[sprite]  # without the anti-aliased rim
     # real buttons: silhouettes vary by at most ~7 in lightness, Pokémon in colour by 15 or more
     if px[:, 0].std() >= 11:
         return True
@@ -244,11 +253,15 @@ def evolve_buttons(words: list[Word]) -> list[Word]:
     Leaves out "evolve" in hint text ("Adventure together to evolve"), which isn't in capitals, and
     MEGA EVOLVE buttons, whose sprite is a Mega Evolution rather than the next species.
     """
+
     def mega(e: Word) -> bool:
         """True when MEGA sits just left of the label or stacked just above it."""
-        return any(norm(w.text) == "MEGA" and (_same_line(w, e) and w.x < e.x
-                                               or 0 <= e.y - (w.y + w.h) < e.h and abs(w.cx - e.cx) < e.w)
-                   for w in words)
+        return any(
+            norm(w.text) == "MEGA"
+            and (_same_line(w, e) and w.x < e.x or 0 <= e.y - (w.y + w.h) < e.h and abs(w.cx - e.cx) < e.w)
+            for w in words
+        )
+
     return [w for w in words if norm(w.text) == "EVOLVE" and w.text.strip().isupper() and not mega(w)]
 
 
@@ -258,8 +271,7 @@ def _screen_species(words: list[Word], m: SpeciesMatcher) -> str | None:
     return max(named)[1] if named else None
 
 
-def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
-                 img: np.ndarray | None = None) -> ScreenResult:
+def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict, img: np.ndarray | None = None) -> ScreenResult:
     """Read '<FAMILY> CANDY' counts from a Pokémon detail screen, skipping the Candy XL label.
 
     With the image, also reads whether the evolution on the EVOLVE button has ever been caught.
@@ -268,7 +280,7 @@ def parse_detail(words: list[Word], m: SpeciesMatcher, species: dict,
     r = ScreenResult("detail", species=_screen_species(words, m))
     cp = _detail_cp(words)
     if r.species and cp is not None:
-        r.specimens.append((r.species, cp))   # each Pokémon swiped past is its own copy; frames share its CP
+        r.specimens.append((r.species, cp))  # each Pokémon swiped past is its own copy; frames share its CP
     evolves = evolve_buttons(words)
     evos = species.get(r.species, {}).get("evolutions", []) if r.species else []
     if len(evos) == 1 and len(evolves) == 1 and img is not None:
@@ -305,7 +317,7 @@ def _detail_cp(words: list[Word]) -> int | None:
                 found.append((w.h, int(j.group(1))))
             elif norm(w.text) == "CP" and i + 1 < len(line) and (n := parse_int(line[i + 1].text)) is not None:
                 found.append((w.h, n))
-    return max(found)[1] if found else None   # the largest: move names and costs are smaller
+    return max(found)[1] if found else None  # the largest: move names and costs are smaller
 
 
 def _candy_label(words: list[Word], line: list[Word], i: int, m: SpeciesMatcher) -> tuple[str, list[Word]] | None:
@@ -317,12 +329,14 @@ def _candy_label(words: list[Word], line: list[Word], i: int, m: SpeciesMatcher)
     for n in (1, 2):
         if i - n < 0:
             break
-        sp = m.match(" ".join(w.text for w in line[i - n:i]))
+        sp = m.match(" ".join(w.text for w in line[i - n : i]))
         if sp:
-            return sp, line[i - n:i + 1]
+            return sp, line[i - n : i + 1]
     candy = line[i]
-    above = sorted((w for w in words if 0 <= candy.y - (w.y + w.h) < candy.h
-                    and w.x < candy.x + candy.w and w.x + w.w > candy.x), key=lambda w: w.x)
+    above = sorted(
+        (w for w in words if 0 <= candy.y - (w.y + w.h) < candy.h and w.x < candy.x + candy.w and w.x + w.w > candy.x),
+        key=lambda w: w.x,
+    )
     sp = m.match(" ".join(w.text for w in above)) if above else None
     return (sp, above + [candy]) if sp else None
 
@@ -358,8 +372,11 @@ def parse_storage(words: list[Word], m: SpeciesMatcher) -> ScreenResult:
         x0, y0, x1, _ = _span(run)
         cx, h = (x0 + x1) / 2, max(w.h for w in run)
         # the CP sits above the name in the same cell: close horizontally, within a cell's height
-        above = [(y0 - cy + 3 * abs(ccx - cx), cp) for ccx, cy, cw, cp in cps
-                 if cy < y0 and y0 - cy < 12 * h and abs(ccx - cx) < max(x1 - x0, cw) * 0.75]
+        above = [
+            (y0 - cy + 3 * abs(ccx - cx), cp)
+            for ccx, cy, cw, cp in cps
+            if cy < y0 and y0 - cy < 12 * h and abs(ccx - cx) < max(x1 - x0, cw) * 0.75
+        ]
         # a name whose CP is scrolled off-screen is skipped; another frame will have the whole cell
         if not above and cps:
             continue
@@ -368,8 +385,9 @@ def parse_storage(words: list[Word], m: SpeciesMatcher) -> ScreenResult:
     return r
 
 
-def parse_pokedex(words: list[Word], img: np.ndarray | None, m: SpeciesMatcher,
-                  sat_threshold: float = 55.0) -> ScreenResult:
+def parse_pokedex(
+    words: list[Word], img: np.ndarray | None, m: SpeciesMatcher, sat_threshold: float = 55.0
+) -> ScreenResult:
     """Read dex numbers, marking each entry caught or seen-only by its sprite's colour saturation.
 
     With the Pokédex filtered to "Seen", every entry shown has been seen but never caught.
@@ -400,17 +418,18 @@ def parse_pokedex(words: list[Word], img: np.ndarray | None, m: SpeciesMatcher,
         # the sprite sits above the number; caught entries are coloured, seen-only are silhouettes
         side = int(max(w.h * 5, w.w * 2))
         x0, y1 = max(0, int(w.cx - side / 2)), max(0, w.y - 2)
-        patch = hsv[max(0, y1 - side):y1, x0:x0 + side]
+        patch = hsv[max(0, y1 - side) : y1, x0 : x0 + side]
         if patch.size == 0:
             continue
-        coloured = patch[..., 1][patch[..., 2] > 40]   # saturation of non-dark pixels
+        coloured = patch[..., 1][patch[..., 2] > 40]  # saturation of non-dark pixels
         sat = float(np.percentile(coloured, 90)) if coloured.size > 20 else 0.0
         (r.dex_caught if sat >= sat_threshold else r.dex_seen_only).add(sp)
     return r
 
 
-def parse(words: list[Word], img: np.ndarray | None, m: SpeciesMatcher, species: dict,
-          kind: str | None = None) -> ScreenResult:
+def parse(
+    words: list[Word], img: np.ndarray | None, m: SpeciesMatcher, species: dict, kind: str | None = None
+) -> ScreenResult:
     """Classify the screen (unless given) and run the matching parser."""
     kind = kind or classify(words)
     if kind == "bag":

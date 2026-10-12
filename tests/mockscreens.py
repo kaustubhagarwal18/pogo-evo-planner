@@ -4,6 +4,7 @@ These only mimic the *text layout* the parsers rely on (labels, numbers, a
 coloured or grey sprite blob). They are not real game screenshots, so passing
 tests here proves the plumbing, not real-world OCR accuracy.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,17 +14,35 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1080, 2340
-_FONT_CANDIDATES = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                    "/Library/Fonts/Arial Bold.ttf", "C:/Windows/Fonts/arialbd.ttf"]
+_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",
+]
 
 GROUND_TRUTH = {
     "rare_candy": 150,
     "candy": {"DRATINI": 60, "FEEBAS": 30, "CHANSEY": 70, "LARVITAR": 90},
-    "storage": [("DRATINI", 412), ("DRAGONAIR", 1543), ("FEEBAS", 126), ("CHANSEY", 389),
-                ("PUPITAR", 1288), ("MAGIKARP", 87), ("EEVEE", 642), ("EEVEE", 701),
-                ("GIBLE", 533), ("BELDUM", 401), ("SCYTHER", 1902), ("KIRLIA", 845),
-                ("ONIX", 677), ("NOIBAT", 498), ("PIDGEY", 210), ("MACHOKE", 1204),
-                ("HAUNTER", 1111), ("RALTS", 310)],
+    "storage": [
+        ("DRATINI", 412),
+        ("DRAGONAIR", 1543),
+        ("FEEBAS", 126),
+        ("CHANSEY", 389),
+        ("PUPITAR", 1288),
+        ("MAGIKARP", 87),
+        ("EEVEE", 642),
+        ("EEVEE", 701),
+        ("GIBLE", 533),
+        ("BELDUM", 401),
+        ("SCYTHER", 1902),
+        ("KIRLIA", 845),
+        ("ONIX", 677),
+        ("NOIBAT", 498),
+        ("PIDGEY", 210),
+        ("MACHOKE", 1204),
+        ("HAUNTER", 1111),
+        ("RALTS", 310),
+    ],
     "dex_caught": [16, 129, 133, 147, 148, 113, 246, 247, 349],
     "dex_seen": [130, 149, 242],
     "detail": [("DRAGONAIR", "DRATINI"), ("FEEBAS", "FEEBAS"), ("CHANSEY", "CHANSEY"), ("PUPITAR", "LARVITAR")],
@@ -60,8 +79,13 @@ def bag_screen() -> np.ndarray:
     """An item bag screen listing Rare Candy, Rare Candy XL and other items with counts."""
     img, d = _canvas()
     _center(d, W / 2, 120, "ITEMS 312/3500", 64)
-    rows = [("Poke Ball", 120), ("Great Ball", 85), ("Rare Candy", GROUND_TRUTH["rare_candy"]),
-            ("Rare Candy XL", 3), ("Razz Berry", 44)]
+    rows = [
+        ("Poke Ball", 120),
+        ("Great Ball", 85),
+        ("Rare Candy", GROUND_TRUTH["rare_candy"]),
+        ("Rare Candy XL", 3),
+        ("Razz Berry", 44),
+    ]
     for i, (name, n) in enumerate(rows):
         y = 320 + i * 260
         d.ellipse((90, y, 250, y + 160), fill=(200, 120, 160))
@@ -123,12 +147,12 @@ def write_recording(path: str | Path, fps: int = 30) -> Path:
         max_off = tall.shape[0] - H
     for _ in range(fps // 2):
         vw.write(tall[:H])
-    for off in np.linspace(0, max_off, fps * 2).astype(int):   # 2 s scroll
-        vw.write(tall[off:off + H])
+    for off in np.linspace(0, max_off, fps * 2).astype(int):  # 2 s scroll
+        vw.write(tall[off : off + H])
     for _ in range(fps // 2):
-        vw.write(tall[max_off:max_off + H])
+        vw.write(tall[max_off : max_off + H])
     for frame in [pokedex_screen()] + [detail_screen(n, f) for n, f in GROUND_TRUTH["detail"]]:
-        for _ in range(fps):                                      # hold each screen 1 s
+        for _ in range(fps):  # hold each screen 1 s
             vw.write(frame)
     vw.release()
     return path
@@ -145,4 +169,5 @@ def write_fixtures(out_dir: str | Path) -> tuple[Path, Path]:
 
 if __name__ == "__main__":
     import sys
+
     print(*write_fixtures(sys.argv[1] if len(sys.argv) > 1 else "mock"))

@@ -30,6 +30,7 @@ Optimisation
    total rare candy <= what you hold and shared items (Metal Coat, Sinnoh
    Stone, lures) aren't over-used, maximising total value.
 """
+
 from __future__ import annotations
 
 from collections import Counter
@@ -95,17 +96,17 @@ class Plan:
     families: list[FamilyPlan]
     trade_instead: list[tuple[Specimen, Step]] = field(default_factory=list)
     unknown_species: list[str] = field(default_factory=list)
-    no_candy_count: list[str] = field(default_factory=list)   # families that needed Rare Candy but have no count
-    unknown_items: list[str] = field(default_factory=list)    # item keys no evolution needs, as written
+    no_candy_count: list[str] = field(default_factory=list)  # families that needed Rare Candy but have no count
+    unknown_items: list[str] = field(default_factory=list)  # item keys no evolution needs, as written
 
 
 @dataclass
 class Settings:
-    dex_bonus: float = 20.0          # km-equivalent value of a new Pokédex entry
-    repeat_value: float = 0.0        # share of value kept by an evolution into a species you already own
+    dex_bonus: float = 20.0  # km-equivalent value of a new Pokédex entry
+    repeat_value: float = 0.0  # share of value kept by an evolution into a species you already own
     allow_trade_evolutions: bool = False  # spend candy on evolutions that are free via trade
-    new_entries_only: bool = False   # only plan evolutions into species never caught (`evolvenew`)
-    rare_candy_blocked_families: frozenset = frozenset()   # on top of every family with no candy count
+    new_entries_only: bool = False  # only plan evolutions into species never caught (`evolvenew`)
+    rare_candy_blocked_families: frozenset = frozenset()  # on top of every family with no candy count
 
 
 def _items_key(c: Counter) -> tuple:
@@ -207,9 +208,13 @@ def families_missing_candy(inv: Inventory, species: dict) -> list[str]:
         """True when some evolution from this species, at any depth, isn't owned yet."""
         return any(e["to"] not in owned or reaches_new(e["to"]) for e in species.get(sp, {}).get("evolutions", []))
 
-    return sorted({species[s.species]["family"] for s in inv.pokemon
-                   if s.species in species and species[s.species]["family"] not in inv.candy
-                   and reaches_new(s.species)})
+    return sorted(
+        {
+            species[s.species]["family"]
+            for s in inv.pokemon
+            if s.species in species and species[s.species]["family"] not in inv.candy and reaches_new(s.species)
+        }
+    )
 
 
 def end_stages(sp: str, species: dict) -> set[str]:
@@ -218,8 +223,9 @@ def end_stages(sp: str, species: dict) -> set[str]:
     return set().union(*(end_stages(e["to"], species) for e in evos)) if evos else {sp}
 
 
-def keep_specimens(specs: list[Specimen], species: dict,
-                   owned: set[str] | frozenset[str] = frozenset()) -> list[Specimen]:
+def keep_specimens(
+    specs: list[Specimen], species: dict, owned: set[str] | frozenset[str] = frozenset()
+) -> list[Specimen]:
     """The specimens worth planning for, in input order: the first of each species, and for a species
     whose line branches (Eevee, Kirlia) one per final evolution not owned yet, so each copy can take a
     different branch.
@@ -233,8 +239,7 @@ def keep_specimens(specs: list[Specimen], species: dict,
     return [s for s in specs if id(s) in keep]
 
 
-def enumerate_paths(spec: Specimen, species: dict, settings: Settings,
-                    trade_out: list) -> list[Path]:
+def enumerate_paths(spec: Specimen, species: dict, settings: Settings, trade_out: list) -> list[Path]:
     """All evolution paths from a specimen, including doing nothing."""
     paths: list[Path] = []
 
@@ -252,9 +257,16 @@ def enumerate_paths(spec: Specimen, species: dict, settings: Settings,
     return paths
 
 
-def family_options(family: str, specimens: list[Specimen], species: dict, inv: Inventory,
-                   cpc: float, settings: Settings, trade_out: list,
-                   from_base: dict[str, int] | None = None) -> list[tuple]:
+def family_options(
+    family: str,
+    specimens: list[Specimen],
+    species: dict,
+    inv: Inventory,
+    cpc: float,
+    settings: Settings,
+    trade_out: list,
+    from_base: dict[str, int] | None = None,
+) -> list[tuple]:
     """Return options (candy, items_key, value, paths) for one family."""
     from_base = from_base if from_base is not None else candy_from_base(species)
     own_candy = inv.candy.get(family, 0)
@@ -330,8 +342,7 @@ def plan(species: dict, tiers: dict, inv: Inventory, settings: Settings | None =
         if blocked and any(c > owned for c, *_ in opts):
             held_back.append(fam)
         # option -> rare candy needed
-        opts = [(max(0, c - owned), c, ikey, v, paths) for c, ikey, v, paths in opts
-                if not (blocked and c > owned)]
+        opts = [(max(0, c - owned), c, ikey, v, paths) for c, ikey, v, paths in opts if not (blocked and c > owned)]
         family_data[fam] = (km, cpc, owned, opts)
 
     # grouped knapsack across families: key (rare_used, items_key) -> (value, picks)
@@ -370,5 +381,13 @@ def plan(species: dict, tiers: dict, inv: Inventory, settings: Settings | None =
             seen.add(k)
             trades.append((spec, step))
     needed = evolution_items(species)
-    return Plan(inv.rare_candy, r_used, total, families, trades, unknown, sorted(held_back),
-                sorted(k for k in inv.items if k not in needed))
+    return Plan(
+        inv.rare_candy,
+        r_used,
+        total,
+        families,
+        trades,
+        unknown,
+        sorted(held_back),
+        sorted(k for k in inv.items if k not in needed),
+    )

@@ -14,6 +14,7 @@ The "pokemon" list can instead come from a CSV (e.g. exported by a scanner
 app). Headers are matched loosely: a species/name column is required, and
 attack/defense/stamina IV columns are used if present.
 """
+
 from __future__ import annotations
 
 import csv
@@ -46,7 +47,7 @@ class Inventory:
     items: dict[str, int] = field(default_factory=dict)
     pokedex: set[str] = field(default_factory=set)
     pokemon: list[Specimen] = field(default_factory=list)
-    not_caught: set[str] = field(default_factory=set)   # overrides a storage reading of the same species
+    not_caught: set[str] = field(default_factory=set)  # overrides a storage reading of the same species
 
 
 def _norm(name: str) -> str:

@@ -1,4 +1,5 @@
 """Turn screenshots and screen recordings into a planner inventory."""
+
 from __future__ import annotations
 
 import re
@@ -26,8 +27,8 @@ class ScanReport:
     frames_read: int = 0
     screens: Counter = field(default_factory=Counter)
     warnings: list[str] = field(default_factory=list)
-    listed: int | None = None   # how many Pokémon the storage search found, from the "(210)" under the tab
-    grid: int = 0               # how many of the storage grid's Pokémon were read
+    listed: int | None = None  # how many Pokémon the storage search found, from the "(210)" under the tab
+    grid: int = 0  # how many of the storage grid's Pokémon were read
 
 
 def load_images(paths: Sequence[str | Path], fps: float = 3.0) -> list[tuple[str, np.ndarray]]:
@@ -88,9 +89,9 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     with_cp: set[tuple[str, int]] = set()
     no_cp: Counter = Counter()
     seen: set[str] = set()
-    shown: set[str] = set()             # Pokémon whose own detail page was captured: you own one
-    caught_votes: Counter = Counter()   # frames showing the species as caught (colour sprite, storage...)
-    never_votes: Counter = Counter()    # frames showing it as never caught (silhouette, "Seen" list)
+    shown: set[str] = set()  # Pokémon whose own detail page was captured: you own one
+    caught_votes: Counter = Counter()  # frames showing the species as caught (colour sprite, storage...)
+    never_votes: Counter = Counter()  # frames showing it as never caught (silhouette, "Seen" list)
     for r, when in zip(results, times):
         if r.rare_candy is not None:
             rare[when][r.rare_candy] += 1
@@ -132,7 +133,8 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
         report.warnings.append(
             f"read {report.grid} of the {report.listed} Pokémon your search found: rows were skipped between "
             "screenshots or frames. Take screenshots that overlap by a row or two (the floating buttons hide "
-            "the bottom row's names), or record the scroll instead")
+            "the bottom row's names), or record the scroll instead"
+        )
     # a detail page proves you own that Pokémon, even when the storage grid wasn't captured
     listed = {p["species"] for p in pokemon}
     pokemon += [{"species": sp, "cp": None, "label": "detail page"} for sp in sorted(shown - listed)]
@@ -149,9 +151,16 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
     }
 
 
-def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps: float = 3.0,
-         progress=None, max_llm_frames: int = 60, llm_model: str | None = None,
-         read_text: Callable[[str, np.ndarray], list[Word]] | None = None) -> tuple[dict, ScanReport]:
+def scan(
+    paths: Sequence[str | Path],
+    species: dict,
+    backend: str = "auto",
+    fps: float = 3.0,
+    progress=None,
+    max_llm_frames: int = 60,
+    llm_model: str | None = None,
+    read_text: Callable[[str, np.ndarray], list[Word]] | None = None,
+) -> tuple[dict, ScanReport]:
     """OCR every screenshot and recording frame, parse each screen, and merge them into an inventory and report.
 
     backend "llm" (= "ollama", local and free) or "claude" reads the screens with a vision LLM instead of
@@ -165,9 +174,12 @@ def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps:
     frames = load_images(paths, fps=fps)
     if backend in LLM_READERS:
         if backend == "claude" and len(frames) > max_llm_frames:
-            raise ValueError(f"{len(frames)} frames would each be a paid Claude request (limit {max_llm_frames}); "
-                             "lower --fps, pass fewer files, or raise --llm-max-frames")
+            raise ValueError(
+                f"{len(frames)} frames would each be a paid Claude request (limit {max_llm_frames}); "
+                "lower --fps, pass fewer files, or raise --llm-max-frames"
+            )
         from . import llm  # needs the `llm` extras
+
         results = llm.read_screens(frames, matcher, species, llm.make_model(backend, llm_model), progress=progress)
     else:
         read = read_text or (lambda _label, img: read_words(img, backend=backend))
@@ -184,12 +196,16 @@ def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps:
 
     misread = sorted({p["species"] for p in inv["pokemon"]} & set(inv["not_caught"]))
     if misread:
-        report.warnings.append("storage shows " + ", ".join(misread) + " but an EVOLVE button shows it as never "
-                               "caught; probably misread from the grid, so the planner treats it as not owned")
+        report.warnings.append(
+            "storage shows " + ", ".join(misread) + " but an EVOLVE button shows it as never "
+            "caught; probably misread from the grid, so the planner treats it as not owned"
+        )
     if not report.screens["bag"]:
         report.warnings.append("no item bag screen found: Rare Candy set to 0")
     missing = families_missing_candy(inventory_from_dict(inv), species)
     if missing:
-        report.warnings.append("no candy count for: " + ", ".join(missing) + " (these can still evolve into a "
-                               "species you don't have; open one detail screen per family, or add them by hand)")
+        report.warnings.append(
+            "no candy count for: " + ", ".join(missing) + " (these can still evolve into a "
+            "species you don't have; open one detail screen per family, or add them by hand)"
+        )
     return inv, report

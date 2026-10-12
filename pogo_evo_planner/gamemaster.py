@@ -12,6 +12,7 @@ Two input formats are supported:
                 "evolutions": [{"to": "DRAGONAIR", "candy": 25, "item": null,
                                 "trade_free": false, "notes": []}]}}
 """
+
 from __future__ import annotations
 
 import json
@@ -118,13 +119,15 @@ def parse_game_master(entries: list) -> dict:
                 if br.get(k):
                     notes.append(tmpl.format(v=br[k]))
             item = br.get("evolutionItemRequirement") or br.get("lureItemRequirement")
-            evolutions.append({
-                "to": _target_key(br),
-                "candy": int(br.get("candyCost", ps.get("candyToEvolve", 0)) or 0),
-                "item": item,
-                "trade_free": bool(br.get("noCandyCostViaTrade", False)),
-                "notes": notes,
-            })
+            evolutions.append(
+                {
+                    "to": _target_key(br),
+                    "candy": int(br.get("candyCost", ps.get("candyToEvolve", 0)) or 0),
+                    "item": item,
+                    "trade_free": bool(br.get("noCandyCostViaTrade", False)),
+                    "notes": notes,
+                }
+            )
         species[key] = {
             "dex": int(tid[1:5]),
             "family": family,

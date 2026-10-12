@@ -13,6 +13,7 @@ The browser app reads screens with tesseract.js instead: it reads the same passe
 RapidOCR returns whole text lines, while the screen parsers work on words, so
 lines are split into words with x positions estimated from character offsets.
 """
+
 from __future__ import annotations
 
 import csv
@@ -33,8 +34,8 @@ import numpy as np
 @dataclass(frozen=True)
 class Word:
     text: str
-    x: int   # left, in original image pixels
-    y: int   # top
+    x: int  # left, in original image pixels
+    y: int  # top
     w: int
     h: int
     conf: float
@@ -51,6 +52,7 @@ class Word:
 
 
 # ---------------- tesseract ----------------
+
 
 def tesseract_available() -> bool:
     """True when the tesseract binary is on PATH."""
@@ -71,8 +73,16 @@ def words_from_tsv(tsv: str, scale: float = 1.0) -> list[Word]:
         conf = float(row.get("conf") or -1)
         if not text or conf < 0:
             continue
-        words.append(Word(text, int(int(row["left"]) / scale), int(int(row["top"]) / scale),
-                          int(int(row["width"]) / scale), int(int(row["height"]) / scale), conf / 100))
+        words.append(
+            Word(
+                text,
+                int(int(row["left"]) / scale),
+                int(int(row["top"]) / scale),
+                int(int(row["width"]) / scale),
+                int(int(row["height"]) / scale),
+                conf / 100,
+            )
+        )
     return words
 
 
@@ -91,8 +101,10 @@ def merge_passes(passes: list[list[Word]]) -> list[Word]:
     """The words of several passes over one screen: the same text at roughly the same place counts once."""
     kept: list[Word] = []
     for w in sorted((w for words in passes for w in words), key=lambda w: -w.conf):
-        if any(k.text.upper() == w.text.upper() and abs(k.cx - w.cx) < max(k.w, 8) and abs(k.cy - w.cy) < max(k.h, 8)
-               for k in kept):
+        if any(
+            k.text.upper() == w.text.upper() and abs(k.cx - w.cx) < max(k.w, 8) and abs(k.cy - w.cy) < max(k.h, 8)
+            for k in kept
+        ):
             continue
         kept.append(w)
     return kept
@@ -104,7 +116,9 @@ def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
         cv2.imwrite(f.name, img)
         out = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
             ["tesseract", f.name, "stdout", "--psm", str(psm), "-l", "eng", "tsv"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
             env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
         ).stdout
     return words_from_tsv(out, scale)
@@ -119,6 +133,7 @@ def _tesseract_words(img: np.ndarray, psm: int = 11) -> list[Word]:
 
 
 # ---------------- rapidocr ----------------
+
 
 @lru_cache(maxsize=1)
 def _rapidocr_engine():
@@ -160,7 +175,7 @@ def _rapidocr_words(img: np.ndarray) -> list[Word]:
     out = _rapidocr_engine()(img)
     if isinstance(out, tuple):  # rapidocr_onnxruntime: (result, elapse); result = [[box, text, score], ...]
         lines = [tuple(r) for r in (out[0] or [])]
-    else:                      # rapidocr >= 2: object with boxes / txts / scores
+    else:  # rapidocr >= 2: object with boxes / txts / scores
         if out.boxes is None:
             return []
         lines = list(zip(out.boxes, out.txts, out.scores))
@@ -172,6 +187,7 @@ def _rapidocr_words(img: np.ndarray) -> list[Word]:
 
 # ---------------- entry point ----------------
 
+
 def available_backend(preferred: str = "auto") -> str:
     """Pick the OCR backend to use, raising with install hints when none is available."""
     if preferred in ("rapidocr", "auto") and rapidocr_available():
@@ -180,8 +196,10 @@ def available_backend(preferred: str = "auto") -> str:
         return "tesseract"
     if preferred == "rapidocr":
         raise RuntimeError("RapidOCR isn't installed. In the project folder, run: pip install -e '.[ocr]'")
-    raise RuntimeError("no OCR engine found. In the project folder, run: pip install -e '.[ocr]' "
-                       "(RapidOCR), or install Tesseract (brew install tesseract / apt install tesseract-ocr)")
+    raise RuntimeError(
+        "no OCR engine found. In the project folder, run: pip install -e '.[ocr]' "
+        "(RapidOCR), or install Tesseract (brew install tesseract / apt install tesseract-ocr)"
+    )
 
 
 def read_words(image: np.ndarray | str | Path, backend: str = "auto") -> list[Word]:

@@ -1,4 +1,5 @@
 """Pull distinct, sharp frames out of a screen recording."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,8 +29,9 @@ def same_screen(a: np.ndarray, b: np.ndarray, threshold: float = 1.0) -> bool:
     return float(np.abs(a - b).mean()) < threshold
 
 
-def extract_frames(video: str | Path, fps: float = 3.0, threshold: float = 1.0,
-                   max_frames: int = 600) -> list[np.ndarray]:
+def extract_frames(
+    video: str | Path, fps: float = 3.0, threshold: float = 1.0, max_frames: int = 600
+) -> list[np.ndarray]:
     """Sample the video, group runs of near-identical frames, keep the sharpest of each run.
 
     Scrolling produces a run of different frames (all kept, so overlapping

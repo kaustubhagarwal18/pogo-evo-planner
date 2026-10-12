@@ -9,6 +9,7 @@
 
 (`python -m pogo_evo_planner.cli ...` works too.)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,8 +36,10 @@ def _title(s: str) -> str:
 
 def render(p: Plan) -> str:
     """Format a plan as the plain-text report printed by `pogo-evo-planner plan`."""
-    out = [(f"Rare candy: using {p.rare_candy_used} of {p.rare_candy_available}"
-           f"  (value score {p.total_value:,.0f})"), ""]
+    out = [
+        (f"Rare candy: using {p.rare_candy_used} of {p.rare_candy_available}  (value score {p.total_value:,.0f})"),
+        "",
+    ]
     spend = [f for f in p.families if f.rare_candy > 0]
     free = [f for f in p.families if f.rare_candy == 0]
     for heading, group in (("Spend rare candy on", spend), ("Already affordable with your own candy", free)):
@@ -66,41 +69,62 @@ def render(p: Plan) -> str:
             out.append(f"   {_title(step.frm)} -> {_title(step.to)} is free when traded{via}")
         out.append("")
     if p.no_candy_count:
-        out.append("No candy count, so no Rare Candy planned for: " + ", ".join(_title(f) for f in p.no_candy_count)
-                   + ' (add their counts under "candy")')
+        out.append(
+            "No candy count, so no Rare Candy planned for: "
+            + ", ".join(_title(f) for f in p.no_candy_count)
+            + ' (add their counts under "candy")'
+        )
     if p.unknown_species:
         out.append("Not in species data (skipped): " + ", ".join(p.unknown_species))
     if p.unknown_items:
-        out.append("No evolution uses these items, so the plan ignores them: " + ", ".join(p.unknown_items)
-                   + ' (check their names under "items")')
+        out.append(
+            "No evolution uses these items, so the plan ignores them: "
+            + ", ".join(p.unknown_items)
+            + ' (check their names under "items")'
+        )
     return "\n".join(out).rstrip() + "\n"
 
 
 def _add_data_args(ap: argparse.ArgumentParser) -> None:
     """Add the --species option shared by every subcommand."""
-    ap.add_argument("--species", default=LATEST if LATEST.exists() else DATA / "species_sample.json",
-                    help="PokeMiners latest.json or a normalized species table "
-                         "(default: data/latest.json from `make gamemaster`, else a small bundled sample)")
+    ap.add_argument(
+        "--species",
+        default=LATEST if LATEST.exists() else DATA / "species_sample.json",
+        help="PokeMiners latest.json or a normalized species table "
+        "(default: data/latest.json from `make gamemaster`, else a small bundled sample)",
+    )
 
 
 def _add_plan_args(ap: argparse.ArgumentParser) -> None:
     """Add the planner tuning and output options."""
     ap.add_argument("--tiers", default=DATA / "rarity_tiers.json", help="rarity tier mapping")
     ap.add_argument("--dex-bonus", type=float, default=20.0, help="value of a new Pokédex entry (km-equivalent)")
-    ap.add_argument("--repeat-value", type=float, default=0.0,
-                    help="share of value kept by evolving into a species you already own (1 = no discount)")
+    ap.add_argument(
+        "--repeat-value",
+        type=float,
+        default=0.0,
+        help="share of value kept by evolving into a species you already own (1 = no discount)",
+    )
     ap.add_argument("--allow-trade-evos", action="store_true", help="spend candy on evolutions that are free via trade")
     ap.add_argument("--json", action="store_true", help="print the plan as JSON")
 
 
 def _add_scan_args(ap: argparse.ArgumentParser) -> None:
     """Add the options shared by the commands that read screens: the reader, frame sampling and the dashboard."""
-    ap.add_argument("--ocr", choices=READERS, default="auto",
-                    help="screen reader (default: OCR). LLMs need the llm extras: 'llm' is the default LLM, "
-                         "'ollama' (a local model, free); 'claude' sends each frame to the Claude API (paid)")
+    ap.add_argument(
+        "--ocr",
+        choices=READERS,
+        default="auto",
+        help="screen reader (default: OCR). LLMs need the llm extras: 'llm' is the default LLM, "
+        "'ollama' (a local model, free); 'claude' sends each frame to the Claude API (paid)",
+    )
     ap.add_argument("--llm-model", help="model for --ocr llm/ollama/claude (default: qwen3-vl:4b / claude-opus-5-5)")
-    ap.add_argument("--llm-max-frames", type=int, default=60,
-                    help="with --ocr claude, refuse to send more frames than this (default 60)")
+    ap.add_argument(
+        "--llm-max-frames",
+        type=int,
+        default=60,
+        help="with --ocr claude, refuse to send more frames than this (default 60)",
+    )
     ap.add_argument("--fps", type=float, default=3.0, help="frames per second sampled from recordings")
     ap.add_argument("--dashboard", metavar="HTML", help="also write the plan as an HTML dashboard")
     ap.add_argument("--open", action="store_true", help="open the dashboard in a browser")
@@ -120,7 +144,7 @@ def _load(what: str, load, path: str | Path) -> Any:
         sys.exit(f"error: can't read the {what} {path}: {e.strerror or e}")
     except KeyError as e:
         sys.exit(f"error: {path} isn't a valid {what} file: an entry has no {e} field")
-    except (ValueError, TypeError, AttributeError) as e:   # bad JSON, or JSON that isn't shaped like one
+    except (ValueError, TypeError, AttributeError) as e:  # bad JSON, or JSON that isn't shaped like one
         sys.exit(f"error: {path} isn't a valid {what} file: {e}")
 
 
@@ -140,9 +164,17 @@ def _make_plan(a, species: dict, inventory_path: str | Path) -> tuple[Plan, Inve
     inv = _load("inventory", lambda path: load_inventory(path, species=species), inventory_path)
     if getattr(a, "pokemon_csv", None):
         inv.pokemon = _load("Pokémon CSV", load_pokemon_csv, a.pokemon_csv)
-    result = plan(species, tiers, inv, Settings(dex_bonus=a.dex_bonus, repeat_value=a.repeat_value,
-                                                 allow_trade_evolutions=a.allow_trade_evos,
-                                                 new_entries_only=getattr(a, "new_entries_only", False)))
+    result = plan(
+        species,
+        tiers,
+        inv,
+        Settings(
+            dex_bonus=a.dex_bonus,
+            repeat_value=a.repeat_value,
+            allow_trade_evolutions=a.allow_trade_evos,
+            new_entries_only=getattr(a, "new_entries_only", False),
+        ),
+    )
     return result, inv
 
 
@@ -188,14 +220,15 @@ def _progress(a):
     def show(i, n, label, kind):
         """Overwrite one stderr line with the frame being read."""
         print(f"\r  [{i}/{n}] {label}: {kind:<8}", end="", file=sys.stderr, flush=True)
+
     return show
 
 
 def _read_screens(a, files: list[str], species: dict, **kw) -> tuple[dict, Any]:
     """Scan the files with the reader --ocr picks. Raises on a file it can't read."""
     from .scan.pipeline import scan  # OpenCV and the OCR or LLM packages are only needed here
-    return scan(files, species, backend=a.ocr, fps=a.fps, max_llm_frames=a.llm_max_frames, llm_model=a.llm_model,
-                **kw)
+
+    return scan(files, species, backend=a.ocr, fps=a.fps, max_llm_frames=a.llm_max_frames, llm_model=a.llm_model, **kw)
 
 
 def _scan(a, files: list[str], species: dict) -> tuple[dict, Any]:
@@ -208,10 +241,12 @@ def _scan(a, files: list[str], species: dict) -> tuple[dict, Any]:
     except ModuleNotFoundError as e:
         extra = "llm" if a.ocr in LLM_READERS else "ocr"
         what = f"--ocr {a.ocr}" if extra == "llm" else "reading screens"
-        sys.exit(f"error: {what} needs the {e.name} module, which isn't installed. "
-                 f"In the project folder, run: pip install -e '.[{extra}]'")
+        sys.exit(
+            f"error: {what} needs the {e.name} module, which isn't installed. "
+            f"In the project folder, run: pip install -e '.[{extra}]'"
+        )
     if not a.quiet:
-        print(file=sys.stderr)   # end the progress line
+        print(file=sys.stderr)  # end the progress line
     return result
 
 
@@ -226,7 +261,7 @@ def _read_evolvenew(a, species: dict) -> tuple[dict, Any]:
     except ValueError as e:
         sys.exit(f"error: {e}")
     inv, report = _scan(a, a.files, species)
-    inv["candy"].update(candy)   # counts typed on the command line win over what was read
+    inv["candy"].update(candy)  # counts typed on the command line win over what was read
     inv["items"].update(items)
     if a.rare_candy is not None:
         inv["rare_candy"] = a.rare_candy
@@ -236,7 +271,7 @@ def _read_evolvenew(a, species: dict) -> tuple[dict, Any]:
     _save(a.output, inv)
 
     print(_read_summary(inv, report), file=sys.stderr)
-    for w in report.warnings:   # the plan covers missing candy and Rare Candy itself
+    for w in report.warnings:  # the plan covers missing candy and Rare Candy itself
         if not w.startswith(("no candy count for", "no item bag screen")):
             print(f"  ! {w}", file=sys.stderr)
     print(f"Saved -> {a.output} (fix a misread count with --candy NAME=N)\n", file=sys.stderr)
@@ -259,8 +294,9 @@ def _ask_and_replan(a, species: dict, inv: dict, plan_inv: Inventory) -> tuple[P
     inv["candy"].update(candy_given)
     inv["items"].update(items_given)
     _save(a.output, inv)
-    given = [f"--candy {f}={n}" for f, n in sorted(candy_given.items())] + \
-            [f'--item "{item_name(i)}={n}"' for i, n in sorted(items_given.items())]
+    given = [f"--candy {f}={n}" for f, n in sorted(candy_given.items())] + [
+        f'--item "{item_name(i)}={n}"' for i, n in sorted(items_given.items())
+    ]
     print(f"\nSaved your answers to {a.output}. To skip the questions next time: {' '.join(given)}\n")
     return _make_plan(a, species, a.output)
 
@@ -294,12 +330,18 @@ def cmd_scan(a) -> None:
 
     summary = ", ".join(f"{k}: {v}" for k, v in sorted(report.screens.items()))
     print(f"Read {report.frames_read} frames ({summary})", file=sys.stderr)
-    print(f"Found {len(inv['pokemon'])} Pokémon, candy for {len(inv['candy'])} families, "
-          f"{len(inv['pokedex'])} Pokédex entries, {inv['rare_candy']} Rare Candy -> {a.output}", file=sys.stderr)
+    print(
+        f"Found {len(inv['pokemon'])} Pokémon, candy for {len(inv['candy'])} families, "
+        f"{len(inv['pokedex'])} Pokédex entries, {inv['rare_candy']} Rare Candy -> {a.output}",
+        file=sys.stderr,
+    )
     for w in report.warnings:
         print(f"  ! {w}", file=sys.stderr)
-    print("Review the file (OCR makes mistakes): add candy counts the scan missed under \"candy\" (a family "
-          "without one gets no Rare Candy) and evolution items under \"items\".", file=sys.stderr)
+    print(
+        'Review the file (OCR makes mistakes): add candy counts the scan missed under "candy" (a family '
+        'without one gets no Rare Candy) and evolution items under "items".',
+        file=sys.stderr,
+    )
     if a.plan:
         print(file=sys.stderr)
         _run_plan(a, species, a.output)
@@ -328,22 +370,41 @@ def build_parser() -> argparse.ArgumentParser:
     _add_plan_args(d)
     d.set_defaults(func=cmd_dashboard)
 
-    e = sub.add_parser("evolvenew", help="plan from the Pokémon the game's `evolvenew` search lists (quickest)",
-                       description="In Pokémon GO, search `evolvenew` in your Pokémon storage and screen-record "
-                                   "yourself scrolling through the results, or screenshot them as you scroll "
-                                   "(overlap a row or two). Add screenshots of the Pokédex filtered to Seen and "
-                                   "your item bag (or --rare-candy).")
-    e.add_argument("files", nargs="+",
-                   help="a recording or screenshots of the evolvenew results, Pokédex Seen screenshots, the item "
-                        "bag, and any detail pages")
+    e = sub.add_parser(
+        "evolvenew",
+        help="plan from the Pokémon the game's `evolvenew` search lists (quickest)",
+        description="In Pokémon GO, search `evolvenew` in your Pokémon storage and screen-record "
+        "yourself scrolling through the results, or screenshot them as you scroll "
+        "(overlap a row or two). Add screenshots of the Pokédex filtered to Seen and "
+        "your item bag (or --rare-candy).",
+    )
+    e.add_argument(
+        "files",
+        nargs="+",
+        help="a recording or screenshots of the evolvenew results, Pokédex Seen screenshots, the item "
+        "bag, and any detail pages",
+    )
     e.add_argument("--rare-candy", type=int, help="your Rare Candy count (instead of a bag screenshot)")
-    e.add_argument("--candy", action="append", default=[], metavar="NAME=N",
-                   help="set or fix a candy count, e.g. --candy NACLI=72 or --candy Naclstack=72 (repeatable)")
-    e.add_argument("--item", action="append", default=[], metavar="NAME=N",
-                   help='evolution items you hold, e.g. --item "Tart Apple=26" --item "Metal Coat=1" (repeatable)')
+    e.add_argument(
+        "--candy",
+        action="append",
+        default=[],
+        metavar="NAME=N",
+        help="set or fix a candy count, e.g. --candy NACLI=72 or --candy Naclstack=72 (repeatable)",
+    )
+    e.add_argument(
+        "--item",
+        action="append",
+        default=[],
+        metavar="NAME=N",
+        help='evolution items you hold, e.g. --item "Tart Apple=26" --item "Metal Coat=1" (repeatable)',
+    )
     e.add_argument("-o", "--output", default="evolvenew.json", help="where to save what was read")
-    e.add_argument("--no-ask", action="store_true",
-                   help="don't ask for missing candy counts; just list them (asking only happens in a terminal)")
+    e.add_argument(
+        "--no-ask",
+        action="store_true",
+        help="don't ask for missing candy counts; just list them (asking only happens in a terminal)",
+    )
     _add_scan_args(e)
     _add_data_args(e)
     _add_plan_args(e)
