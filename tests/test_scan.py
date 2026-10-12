@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess  # only to build a CalledProcessError for a fake failing Tesseract  # nosec B404
 import tempfile
 import time
 import unittest
@@ -13,6 +14,7 @@ from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.scan.frames import extract_frames
 from pogo_evo_planner.scan.ocr import (
     Word,
+    _run_tesseract,
     _split_line,
     available_backend,
     merge_passes,
@@ -378,6 +380,17 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(
             merge_passes([[unsure], [confident, make_word("60", 100, 50)]]), [confident, make_word("60", 100, 50)]
         )
+
+    def test_tesseract_failing_is_one_readable_error(self):
+        """When Tesseract itself fails on a screen, the error says so in a line, ending with Tesseract's reason."""
+        failure = subprocess.CalledProcessError(
+            1, ["tesseract"], stderr="Tesseract Open Source OCR\nError during processing.\n"
+        )
+        with (
+            mock.patch("pogo_evo_planner.scan.ocr.subprocess.run", side_effect=failure),
+            self.assertRaisesRegex(RuntimeError, "^Tesseract failed on a screen: Error during processing.$"),
+        ):
+            _run_tesseract(np.zeros((20, 20, 3), np.uint8), 1.0, 11)
 
     def test_scan_takes_words_read_elsewhere(self):
         """scan() parses words it's given (the browser's tesseract.js) instead of running OCR itself."""

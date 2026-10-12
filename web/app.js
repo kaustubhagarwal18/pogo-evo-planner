@@ -514,10 +514,16 @@ async function send() {
   busy = true;
   byId("plan-state").textContent = "Planning…";
   byId("dash").classList.add("stale");
-  const answer = await call("plan", { request: { inventory: state.inv, options: state.options,
-                                                 source: state.example ? "the example inventory"
-                                                   : state.source || "your inventory" } });
-  busy = false;
+  let answer;
+  try {
+    answer = await call("plan", { request: { inventory: state.inv, options: state.options,
+                                             source: state.example ? "the example inventory"
+                                               : state.source || "your inventory" } });
+  } catch (error) {   // the worker itself failed; the page still answers, and the next edit plans again
+    answer = { reply: { error: "The planner stopped working: " + error.message + ". Reload the page." }, ms: 0 };
+  } finally {
+    busy = false;
+  }
   if (again) {   // this answer is for an older inventory: plan the current one instead
     again = false;
     send();
@@ -583,7 +589,7 @@ function showNoPlan() {
   byId("plan-state").textContent = "";
 }
 
-call("start", { build: BUILD }).then(ready, (error) => {
+call("start", { build: BUILD }).then(ready).catch((error) => {
   status("error", `The planner didn't load: ${error.message}. Check your connection, then reload the page.`);
 });
 
@@ -711,22 +717,24 @@ function removeButtonQuiet(glyph, label, remove) {
   return button;
 }
 
-/** Read one screenshot: the worker makes the images to read, tesseract.js reads them, the worker parses the text. */
+/** Read one screenshot: the worker makes the images to read, tesseract.js reads them, the worker parses the text.
+    A screenshot that can't be read is marked failed with the reason, and the others carry on. */
 async function readShot(shot, scheduler) {
   shot.state = "reading";
   renderShots();
-  const passes = await call("scan-add", { name: shot.name, modified: shot.file.lastModified,
-                                          data: await shot.file.arrayBuffer() });
-  if (passes.error) {
-    Object.assign(shot, { state: "failed", note: passes.error });
-    return;
+  try {
+    const passes = await call("scan-add", { name: shot.name, modified: shot.file.lastModified,
+                                            data: await shot.file.arrayBuffer() });
+    const tsvs = await Promise.all(passes.map(async (imagePass) => {
+      const job = await scheduler.addJob("recognize", new Blob([imagePass.png], { type: "image/png" }), {},
+                                         { tsv: true, text: false, blocks: false });
+      return { tsv: job.data.tsv, scale: imagePass.scale };
+    }));
+    const { kind } = await call("scan-read", { name: shot.name, tsvs });
+    Object.assign(shot, { state: "done", kind });
+  } catch (error) {
+    Object.assign(shot, { state: "failed", note: error.message });
   }
-  const tsvs = await Promise.all(passes.map(async (imagePass) => {
-    const job = await scheduler.addJob("recognize", new Blob([imagePass.png], { type: "image/png" }), {},
-                                       { tsv: true, text: false, blocks: false });
-    return { tsv: job.data.tsv, scale: imagePass.scale };
-  }));
-  Object.assign(shot, { state: "done", kind: (await call("scan-read", { name: shot.name, tsvs })).kind });
   renderShots();
 }
 

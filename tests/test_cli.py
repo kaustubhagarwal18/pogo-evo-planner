@@ -149,6 +149,25 @@ class CliTests(unittest.TestCase):
             "as Sinnoh Stone and ITEM_GEN4_EVOLUTION_STONE; keep one",
         )
 
+    def test_an_output_that_cant_be_written_gives_one_line(self):
+        """A dashboard written into a folder that doesn't exist stops with one line, not a traceback."""
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "missing" / "dashboard.html"
+            message, _ = run(
+                "dashboard", str(ROOT / "examples/inventory_sample.json"), "--species", SAMPLE, "-o", str(output)
+            )
+        self.assertEqual(message, f"error: can't write the dashboard {output}: No such file or directory")
+
+    def test_ctrl_c_stops_without_a_traceback(self):
+        """Ctrl-C stops a command with the shell's usual exit code and no traceback."""
+        with (
+            mock.patch("pogo_evo_planner.cli.cmd_plan", side_effect=KeyboardInterrupt),
+            contextlib.redirect_stderr(io.StringIO()) as printed,
+            self.assertRaises(SystemExit) as stop,
+        ):
+            cli.main(["plan", "inventory.json"])
+        self.assertEqual((stop.exception.code, printed.getvalue().strip()), (130, "stopped"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -162,9 +162,17 @@ def _species(args) -> dict:
     return _load("species table", load_species, args.species)
 
 
+def _write(path: str | Path, text: str, what: str) -> None:
+    """Write a file; exit with one readable line when it can't be written (a missing folder, no permission)."""
+    try:
+        Path(path).write_text(text, encoding="utf-8")
+    except OSError as error:
+        sys.exit(f"error: can't write the {what} {path}: {error.strerror or error}")
+
+
 def _save(path: str | Path, inventory: dict) -> None:
     """Write an inventory dict as indented JSON."""
-    Path(path).write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+    _write(path, json.dumps(inventory, indent=2) + "\n", "inventory")
 
 
 def _make_plan(args, species: dict, inventory_path: str | Path) -> tuple[Plan, Inventory]:
@@ -198,7 +206,7 @@ def _write_dashboard(args, species: dict, inventory_path: str | Path, output: st
     from .dashboard import build_view, render_html
 
     result, inventory = _make_plan(args, species, inventory_path)
-    Path(output).write_text(render_html(build_view(result, inventory, species, source)), encoding="utf-8")
+    _write(output, render_html(build_view(result, inventory, species, source)), "dashboard")
     print(f"Dashboard -> {output}", file=sys.stderr)
     if getattr(args, "open", False):
         webbrowser.open(Path(output).resolve().as_uri())
@@ -451,7 +459,11 @@ def main(argv: list[str] | None = None) -> None:
     if argv and argv[0] not in ("plan", "scan", "dashboard", "evolvenew", "-h", "--help"):
         argv = ["plan", *argv]
     args = build_parser().parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except KeyboardInterrupt:  # Ctrl-C: stop without a traceback, with the shell's usual exit code
+        print("\nstopped", file=sys.stderr)
+        sys.exit(130)
 
 
 if __name__ == "__main__":

@@ -116,13 +116,18 @@ def _run_tesseract(image: np.ndarray, scale: float, segmentation_mode: int) -> l
     """One Tesseract pass over an image, with boxes scaled back to original pixels."""
     with tempfile.NamedTemporaryFile(suffix=".png") as png_file:
         cv2.imwrite(png_file.name, image)
-        tsv = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
-            ["tesseract", png_file.name, "stdout", "--psm", str(segmentation_mode), "-l", "eng", "tsv"],
-            capture_output=True,
-            text=True,
-            check=True,
-            env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
-        ).stdout
+        try:
+            tsv = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
+                ["tesseract", png_file.name, "stdout", "--psm", str(segmentation_mode), "-l", "eng", "tsv"],
+                capture_output=True,
+                text=True,
+                check=True,
+                env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
+            ).stdout
+        except subprocess.CalledProcessError as error:  # reported as one line by the commands, like a missing engine
+            stderr_lines = (error.stderr or "").strip().splitlines()
+            reason = stderr_lines[-1] if stderr_lines else f"exit status {error.returncode}"
+            raise RuntimeError(f"Tesseract failed on a screen: {reason}") from error
     return words_from_tsv(tsv, scale)
 
 

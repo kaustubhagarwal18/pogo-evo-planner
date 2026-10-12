@@ -44,7 +44,10 @@ def package_zip() -> bytes:
 
 def site_files(species_path: Path) -> tuple[dict[str, bytes], int]:
     """Every file of the site by name, with index.html stamped with a build id, and the number of species."""
-    species = load_species(species_path)
+    try:
+        species = load_species(species_path)
+    except (ValueError, KeyError) as error:  # not JSON, or a game master entry missing a field
+        raise ValueError(f"{species_path} isn't a valid species table: {error}") from error
     files = {path.name: path.read_bytes() for path in sorted(WEB.iterdir()) if path.is_file()}
     files["planner.zip"] = package_zip()
     files["species.json"] = json.dumps(species, separators=(",", ":")).encode()
@@ -82,7 +85,8 @@ def main(argv: list[str] | None = None) -> None:
         files, species_count = site_files(args.species)
         write_site(args.output, files)
     except OSError as error:
-        sys.exit(f"error: can't build the site: {error.strerror or error}: {error.filename}")
+        where = f": {error.filename}" if error.filename else ""
+        sys.exit(f"error: can't build the site: {error.strerror or error}{where}")
     except ValueError as error:  # a species file that isn't JSON, or an output folder that isn't ours
         sys.exit(f"error: {error}")
     sample = " (the bundled sample; run `make gamemaster` for every species)" if args.species == SAMPLE_SPECIES else ""

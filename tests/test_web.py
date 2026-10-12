@@ -20,7 +20,7 @@ from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.inventory import inventory_from_dict
 from pogo_evo_planner.planner import Settings, plan
 from pogo_evo_planner.scan.ocr import Word
-from pogo_evo_planner.webapp import WebPlanner, settings_from
+from pogo_evo_planner.webapp import InputError, WebPlanner, json_api, settings_from
 
 from . import mockscreens
 
@@ -30,6 +30,11 @@ SPECIES = load_species(SAMPLE)
 TIERS = json.loads((ROOT / "pogo_evo_planner/data/rarity_tiers.json").read_text(encoding="utf-8"))
 EXAMPLE = json.loads((ROOT / "examples/inventory_sample.json").read_text(encoding="utf-8"))
 BUILD = runpy.run_path(str(ROOT / "scripts/build_web.py"), run_name="build_web")
+
+
+def page_call(method, **args):
+    """Call a @json_api method as the page does: the arguments as one JSON object, the reply parsed."""
+    return json.loads(method(json.dumps(args)))
 
 
 def ask(planner: WebPlanner, inventory: dict, **options) -> dict:
@@ -156,22 +161,13 @@ class WebScanTests(unittest.TestCase):
             scanner = self.planner.scanner(str(Path(folder) / "scan"))
             for name, (image, words) in shots.items():
                 cv2.imwrite(str(scanner.folder / name), image)
-                passes = json.loads(scanner.passes_json(name))
+                passes = page_call(scanner.passes_json, name=name)
                 self.assertEqual([Path(read_pass["path"]).is_file() for read_pass in passes], [True] * 3)
-                kind = json.loads(
-                    scanner.read_json(
-                        name,
-                        json.dumps(
-                            [
-                                {"tsv": tsv(words, read_pass["scale"]), "scale": read_pass["scale"]}
-                                for read_pass in passes
-                            ]
-                        ),
-                    )
-                )["kind"]
+                tsvs = [{"tsv": tsv(words, read_pass["scale"]), "scale": read_pass["scale"]} for read_pass in passes]
+                kind = page_call(scanner.read_json, name=name, tsvs=tsvs)["kind"]
                 self.assertIn(kind, ("bag", "detail"))
                 self.assertFalse(any(scanner.folder.glob(".passes/*")))  # read passes are removed
-            reply = json.loads(scanner.finish_json(evolvenew))
+            reply = page_call(scanner.finish_json, evolvenew=evolvenew)
             self.assertFalse(scanner.folder.exists())  # the scan's folder goes when it finishes
         return reply
 
@@ -201,8 +197,42 @@ class WebScanTests(unittest.TestCase):
             scanner = self.planner.scanner(str(Path(folder) / "scan"))
             (scanner.folder / "notes.png").write_text("not a picture", encoding="utf-8")
             self.assertEqual(
-                json.loads(scanner.passes_json("notes.png")), {"error": "notes.png isn't a PNG or JPEG screenshot"}
+                page_call(scanner.passes_json, name="notes.png"), {"error": "notes.png isn't a PNG or JPEG screenshot"}
             )
+
+    def test_the_folder_goes_even_when_finishing_fails(self):
+        """A scan that fails while merging still removes its folder of screenshots."""
+        with tempfile.TemporaryDirectory() as folder:
+            scanner = self.planner.scanner(str(Path(folder) / "scan"))
+            scanner.words["gone.png"] = BAG  # read, but the file has since disappeared
+            with self.assertRaises(ValueError):
+                page_call(scanner.finish_json, evolvenew=False)
+            self.assertFalse(scanner.folder.exists())
+
+
+class JsonApiTests(unittest.TestCase):
+    class Echo:
+        """A stand-in for a class the page calls."""
+
+        @json_api
+        def echo(self, word: str = "none") -> dict:
+            """Reply with the word, or refuse one the player could fix, or fail like a bug would."""
+            if word == "bad":
+                raise InputError("that word won't do")
+            if word == "bug":
+                raise KeyError("oops")
+            return {"word": word}
+
+    def test_arguments_come_from_one_json_object_and_the_reply_is_json(self):
+        """The page's JSON object becomes keyword arguments, an empty call uses the defaults, the reply is JSON."""
+        self.assertEqual(self.Echo().echo(json.dumps({"word": "candy"})), '{"word": "candy"}')
+        self.assertEqual(self.Echo().echo(), '{"word": "none"}')
+
+    def test_input_errors_become_a_message_and_bugs_are_raised(self):
+        """A mistake the player can fix comes back as {"error"}; anything else is a bug and isn't hidden."""
+        self.assertEqual(page_call(self.Echo().echo, word="bad"), {"error": "that word won't do"})
+        with self.assertRaises(KeyError):
+            self.Echo().echo(json.dumps({"word": "bug"}))
 
 
 class SiteBuildTests(unittest.TestCase):
@@ -261,6 +291,15 @@ class SiteBuildTests(unittest.TestCase):
             used, extras = done.stdout.splitlines()
             self.assertEqual(int(used), plan(SPECIES, TIERS, inventory_from_dict(EXAMPLE)).rare_candy_used)
             self.assertEqual(extras, "[]")
+
+    def test_a_broken_species_file_is_named(self):
+        """A species file that isn't JSON stops the build with one line naming the file."""
+        with tempfile.TemporaryDirectory() as folder:
+            broken = Path(folder) / "species.json"
+            broken.write_text("{not json", encoding="utf-8")
+            with self.assertRaises(SystemExit) as stop:
+                BUILD["main"](["--species", str(broken), "-o", str(Path(folder) / "site")])
+            self.assertTrue(str(stop.exception.code).startswith(f"error: {broken} isn't a valid species table: "))
 
     def test_refuses_to_replace_a_folder_it_didnt_build(self):
         """An output folder holding anything other than an earlier build is left alone, with one line saying why."""
