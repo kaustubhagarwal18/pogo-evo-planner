@@ -14,7 +14,8 @@ Before 1.0, a new minor version may change commands or file formats.
   counts, evolution items and Rare Candy the plan is missing. Everything runs in the page: the
   planner's and scanner's own Python through Pyodide, and tesseract.js reading the text with the
   `--ocr tesseract` reader's model. Screenshots and the inventory never leave the browser; the
-  browser keeps the inventory between visits.
+  browser keeps the inventory between visits, and **Reset** removes it, with the settings, and
+  starts again from the example.
 - `scan()` takes `read_text`, words read elsewhere in place of OCR, and `ocr.py` has the pieces
   the browser shares with the Tesseract reader: `tesseract_passes`, `words_from_tsv` (with or
   without a header row) and `merge_passes`.

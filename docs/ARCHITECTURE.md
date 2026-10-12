@@ -335,7 +335,8 @@ flowchart LR
   inventory that isn't valid raises `InputError`, naming what's wrong.
 - **Start.** A first visit opens the bundled example (`inventory_sample.json`) under a start card
   offering the two ways in: screenshots or an inventory file. The example is replaced without a
-  question; the player's own inventory only after they confirm, and **Close** goes back to the
+  question; the player's own inventory only after they confirm. **Reset** forgets everything the
+  page kept in the browser (inventory, settings, the screenshot summary) and goes back to the
   example.
 - **Editor.** `app.js` checks a file as it opens, keeping fields it doesn't use so a download gives
   back everything. It normalizes names to ids ("Mr. Mime" to `MR_MIME`), refuses species and items
