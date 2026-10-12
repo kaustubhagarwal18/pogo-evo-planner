@@ -11,11 +11,17 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 from pogo_evo_planner.cli import render
 from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.inventory import inventory_from_dict
 from pogo_evo_planner.planner import Settings, plan
+from pogo_evo_planner.scan.ocr import Word
 from pogo_evo_planner.webapp import WebPlanner, settings_from
+
+from . import mockscreens
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "pogo_evo_planner/data/species_sample.json"
@@ -28,6 +34,18 @@ BUILD = runpy.run_path(str(ROOT / "scripts/build_web.py"), run_name="build_web")
 def ask(planner: WebPlanner, inventory: dict, **options) -> dict:
     """Plan an inventory through the JSON interface the page uses."""
     return json.loads(planner.plan_json(json.dumps({"inventory": inventory, "options": options, "source": "test"})))
+
+
+def tsv(words: list[Word], scale: float = 1.0) -> str:
+    """Words as tesseract.js writes them: TSV rows with no header, boxes in the pixels of the image it read."""
+    return "".join(f"5\t1\t1\t1\t1\t{i}\t{round(w.x * scale)}\t{round(w.y * scale)}\t{round(w.w * scale)}\t"
+                   f"{round(w.h * scale)}\t{w.conf * 100:.0f}\t{w.text}\n" for i, w in enumerate(words))
+
+
+BAG = [Word("Rare", 300, 900, 88, 40, 0.9), Word("Candy", 420, 900, 110, 40, 0.9), Word("x150", 860, 900, 88, 40, 0.9)]
+DRAGONAIR = [Word("Dragonair", 400, 900, 198, 80, 0.9), Word("60", 760, 1240, 44, 40, 0.9),
+             Word("DRATINI", 640, 1320, 154, 40, 0.9), Word("CANDY", 820, 1320, 110, 40, 0.9),
+             Word("EVOLVE", 450, 1760, 132, 40, 0.9)]
 
 
 def build(out: Path) -> str:
@@ -91,11 +109,68 @@ class WebPlannerTests(unittest.TestCase):
         reply = ask(self.planner, {**kirlia, "items": {"Sinnoh Stone": 1, "ITEM_SINNOH_STONE": 1}})
         self.assertIn("lists Sinnoh Stone twice", reply["error"])
 
+    def test_items_asked_only_for_evolutions_the_plan_counts(self):
+        """With new entries only (evolvenew), an item for a species already registered isn't asked for; otherwise it is,
+        since evolving into a species you don't hold still counts."""
+        inv = {"candy": {"RALTS": 300}, "pokedex": ["GALLADE"], "pokemon": [{"species": "KIRLIA"}]}
+        self.assertEqual(ask(self.planner, inv)["missing_items"],
+                         {"ITEM_GEN4_EVOLUTION_STONE": [["KIRLIA", "GALLADE"]]})
+        self.assertEqual(ask(self.planner, inv, new_entries_only=True)["missing_items"], {})
+
     def test_catalog_has_families_and_item_names(self):
         """The editor gets each species' family and dex number, and items by the names players use."""
         catalog = json.loads(self.planner.catalog_json())
         self.assertEqual(catalog["species"]["DRAGONITE"], {"family": "DRATINI", "dex": 149})
         self.assertEqual(catalog["items"]["ITEM_METAL_COAT"], "Metal Coat")
+
+
+class WebScanTests(unittest.TestCase):
+    planner = WebPlanner(SAMPLE.read_text(encoding="utf-8"))
+
+    def scan_shots(self, shots: dict[str, tuple], evolvenew: bool = False) -> dict:
+        """Read screenshots {name: (image, words)} through WebScan as the page does, with each pass's TSV made from
+        the words; return finish_json's reply."""
+        with tempfile.TemporaryDirectory() as tmp:
+            scanner = self.planner.scanner(str(Path(tmp) / "scan"))
+            for name, (image, words) in shots.items():
+                cv2.imwrite(str(scanner.folder / name), image)
+                passes = json.loads(scanner.passes_json(name))
+                self.assertEqual([Path(p["path"]).is_file() for p in passes], [True] * 3)
+                kind = json.loads(scanner.read_json(name, json.dumps(
+                    [{"tsv": tsv(words, p["scale"]), "scale": p["scale"]} for p in passes])))["kind"]
+                self.assertIn(kind, ("bag", "detail"))
+                self.assertFalse(any(scanner.folder.glob(".passes/*")))   # read passes are removed
+            reply = json.loads(scanner.finish_json(evolvenew))
+            self.assertFalse(scanner.folder.exists())   # the scan's folder goes when it finishes
+        return reply
+
+    def test_screenshots_become_an_inventory(self):
+        """A bag and a Pokémon page read as `scan` reads them: Rare Candy, the family's candy and the Pokémon."""
+        blank = np.full((2400, 1080, 3), 250, np.uint8)
+        reply = self.scan_shots({"bag.png": (mockscreens.bag_screen(), BAG), "dragonair.png": (blank, DRAGONAIR)})
+        inv = reply["inventory"]
+        self.assertEqual((inv["rare_candy"], inv["candy"]), (150, {"DRATINI": 60}))
+        self.assertEqual([p["species"] for p in inv["pokemon"]], ["DRAGONAIR"])
+        self.assertEqual((reply["screens"], reply["bag"]), ({"bag": 1, "detail": 1}, True))
+        self.assertNotIn("DRAGONITE", inv["not_caught"])
+
+    def test_evolvenew_marks_the_listed_evolutions_never_caught(self):
+        """In the evolvenew way, a listed Pokémon's evolution is never caught, and the page asks for Rare Candy
+        rather than warn when no bag was read."""
+        blank = np.full((2400, 1080, 3), 250, np.uint8)
+        reply = self.scan_shots({"dragonair.png": (blank, DRAGONAIR)}, evolvenew=True)
+        self.assertEqual(reply["inventory"]["not_caught"], ["DRAGONITE"])
+        self.assertFalse(reply["bag"])
+        self.assertFalse([w for w in reply["warnings"] if "bag" in w or "candy count" in w])
+        self.assertEqual(reply["mega_only"], [])
+
+    def test_a_file_that_isnt_an_image_is_named(self):
+        """A file that isn't a PNG or JPEG gets one line naming it, not a crash."""
+        with tempfile.TemporaryDirectory() as tmp:
+            scanner = self.planner.scanner(str(Path(tmp) / "scan"))
+            (scanner.folder / "notes.png").write_text("not a picture", encoding="utf-8")
+            self.assertEqual(json.loads(scanner.passes_json("notes.png")),
+                             {"error": "notes.png isn't a PNG or JPEG screenshot"})
 
 
 class SiteBuildTests(unittest.TestCase):

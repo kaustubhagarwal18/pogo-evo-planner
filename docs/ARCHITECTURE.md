@@ -295,7 +295,7 @@ missing from the species data.
 ## 6. The browser app (`web/`)
 
 The page is static: no server code runs, so any static host can serve it. The planner's own Python
-runs in the browser through Pyodide, and the inventory never leaves the page.
+runs in the browser through Pyodide, and neither the screenshots nor the inventory leave the page.
 
 ```mermaid
 flowchart LR
@@ -307,6 +307,12 @@ flowchart LR
         K --> WP[webapp.WebPlanner<br/>planner.plan, cli.render, dashboard]
         WP -->|report, dashboard,<br/>missing counts| A
         A --> F[sandboxed frame<br/>the dashboard]
+        S[screenshots] --> K
+        K --> WS[webapp.WebScan<br/>ocr.tesseract_passes]
+        WS -->|three passes, PNG| T[tesseract.js<br/>in app.js]
+        T -->|TSV| WS
+        WS --> SP[pipeline.scan<br/>parse, merge, apply_evolvenew]
+        SP -->|inventory| A
     end
     Z --> K
     SJ --> K
@@ -319,17 +325,34 @@ flowchart LR
 - **What `WebPlanner` returns.** `plan_json` gives the text report, the dashboard page and the
   Rare Candy totals. It also lists what the plan is missing: families without a candy count
   (`families_missing_candy`), and evolution items the inventory doesn't list that an owned Pokémon
-  needs, at any depth, to reach a species not owned yet (`items_to_ask`). An unlisted item is
+  needs, at any depth, to reach a species the plan counts as new (`items_to_ask`, by the planner's
+  own `gives_new_species`: with new entries only, a species already registered doesn't count). An unlisted item is
   unknown, so the page asks for it, as it does for a missing candy count. A bad inventory comes back
   as `{"error": ...}`, in one line.
+- **Start.** A first visit opens the bundled example (`inventory_sample.json`) under a start card
+  offering the two ways in: screenshots or an inventory file. The example is replaced without a
+  question; the player's own inventory only after they confirm, and **Close** goes back to the
+  example.
 - **Editor.** `app.js` checks a file as it opens, keeping fields it doesn't use so a download gives
   back everything. It normalizes names to ids ("Mr. Mime" to `MR_MIME`), refuses species and items
   the species table doesn't have, and flags rows the plan will skip. It saves the inventory and the
   settings in the browser's `localStorage` (the page still works if storage is off). It plans again
   250 ms after the last edit.
+- **Screenshots.** The page asks what was captured, as the two commands do: the `evolvenew`
+  search or the whole collection. The worker loads NumPy and OpenCV (Pyodide builds) the first
+  time, and makes a `WebScan` over a folder in Pyodide's file system. Each screenshot is written
+  there with its own modification time, which `taken_at` falls back on as it does for a file on
+  disk. Python makes the command line's three passes (`ocr.tesseract_passes`: grey, negative,
+  upscaled). tesseract.js reads them in the page with the same "fast" English model, in page
+  segmentation mode 11, as the command line. Its TSV comes back through `ocr.words_from_tsv` and
+  `ocr.merge_passes`, and `pipeline.scan(read_text=...)` takes those words instead of running OCR.
+  So parsing, merging, the Evolve-button check and the warnings are the command's own code. Fed the
+  command line's own TSV, `WebScan` gives exactly `scan`'s inventory; with tesseract.js, it did too
+  on 11 real screenshots. The `evolvenew` way adds `apply_evolvenew` and plans new entries only.
+  The page asks for the Rare Candy count when no bag screenshot was read, rather than plan with 0.
 - **Dashboard frame.** The dashboard HTML goes into an `<iframe>` sandboxed without
-  `allow-same-origin`, so its scripts can't reach the page or its storage; its links open in a new tab. A small script added to it reports its
-  height, so the frame fits it.
+  `allow-same-origin`, so its scripts can't reach the page or its storage; its links open in a new
+  tab. A small script added to it reports its height, so the frame fits it.
 - **Build.** `build_web.py` zips the package with fixed dates, so the same files give the same
   bytes. It stamps a hash of every file into `index.html` as the build id, and the page adds that
   id to every URL it loads, so a deployment is never mixed with cached files. It refuses to replace
@@ -348,6 +371,7 @@ flowchart LR
 | the `evolvenew` flow: what's missing, the questions, the plain-words plan | [`evolvenew.py`](../pogo_evo_planner/evolvenew.py) |
 | commands, their error messages, text report | [`cli.py`](../pogo_evo_planner/cli.py) |
 | dashboard data | [`dashboard.py`](../pogo_evo_planner/dashboard.py) |
-| what the browser app calls: plan JSON, missing counts, catalog | [`webapp.py`](../pogo_evo_planner/webapp.py) |
+| what the browser app calls: plan JSON, missing counts, catalog, screenshots (`WebScan`) | [`webapp.py`](../pogo_evo_planner/webapp.py) |
+| Tesseract's passes and TSV, shared by the command line and the browser | [`scan/ocr.py`](../pogo_evo_planner/scan/ocr.py) |
 | the browser app's editor, worker and styles | [`web/`](../web/) |
 | building the site; publishing it | [`scripts/build_web.py`](../scripts/build_web.py), [`pages.yml`](../.github/workflows/pages.yml) |

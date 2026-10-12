@@ -33,27 +33,74 @@
   <section class="pane" id="pane-inv" aria-label="Inventory">
     <p class="msg" id="msg" role="alert" hidden></p>
 
-    <div class="start" id="start">
-      <h2>Start with your inventory</h2>
-      <p>Open the <code>inventory.json</code> or <code>evolvenew.json</code> that
-        <code>pogo-evo-planner scan</code> or <code>evolvenew</code> saved, or type yours in here.</p>
-      <div class="actions">
-        <label class="btn primary">Open a file<input type="file" class="pick" accept=".json,application/json" hidden></label>
-        <button type="button" class="btn" id="sample">Try the example</button>
-        <button type="button" class="btn" id="blank">Start empty</button>
+    <section class="start" id="start" aria-labelledby="start-h">
+      <h2 id="start-h">Plan your own evolutions</h2>
+      <p id="start-example">Below is an example inventory and its plan, so you can see how it works. Replace it
+        with yours:</p>
+      <div class="choices">
+        <button type="button" class="choice shots-open">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M9.5 18.5h5"/></svg>
+          <b>Upload screenshots</b>
+          <span>Your item bag, Pokémon and Pokédex, or the game's <code>evolvenew</code> search. The page reads
+            them for you.</span>
+        </button>
+        <label class="choice">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M14 2v5h5M8 13h8M8 17h5"/></svg>
+          <b>Upload inventory.json</b>
+          <span>The <code>inventory.json</code> or <code>evolvenew.json</code> that <code>pogo-evo-planner</code>
+            saved, or one you wrote.</span>
+          <input type="file" class="pick" accept=".json,application/json" hidden>
+        </label>
       </div>
-      <p class="hint">Or drop the file anywhere on this page. It stays in this browser: nothing is uploaded.</p>
-    </div>
+      <p class="hint">Or drop either on the page. Files stay in this browser: nothing is sent anywhere.
+        <a href="inventory_sample.json" download>Download the example</a> to see an inventory's format, or
+        <button type="button" class="link" id="blank">start from an empty one</button> and type yours in.</p>
+    </section>
+
+    <section class="card scan" id="scan" aria-labelledby="scan-h" hidden>
+      <h2 id="scan-h">Read screenshots</h2>
+      <fieldset>
+        <legend>What did you capture?</legend>
+        <label class="opt"><input type="radio" name="mode" value="evolvenew">
+          <span><b>The game's <code>evolvenew</code> search</b><span class="help">Quickest. In your Pokémon storage,
+            search <code>evolvenew</code> and screenshot the results as you scroll, overlapping a row or two. Add the
+            Pokédex filtered to Seen, and your item bag.</span></span></label>
+        <label class="opt"><input type="radio" name="mode" value="collection">
+          <span><b>Your whole collection</b><span class="help">Your item bag, your Pokémon storage as you scroll, the
+            Pokédex, and one Pokémon's page per family for its candy count.</span></span></label>
+      </fieldset>
+      <div class="actions">
+        <label class="btn">Choose screenshots<input type="file" id="shots" accept="image/*" multiple hidden></label>
+        <span class="hint">or drop them on the page</span>
+      </div>
+      <ol class="shots" id="shot-list"></ol>
+      <p class="hint" id="scan-state" role="status"></p>
+      <p class="err" id="scan-msg" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" class="btn primary" id="read" disabled>Read screenshots</button>
+        <button type="button" class="btn quiet" id="scan-cancel">Cancel</button>
+      </div>
+      <p class="hint">Read in this browser, never uploaded. The first time, the page downloads about 17 MB more for
+        reading text and images; the browser keeps it for next time. Recordings aren't read here yet.</p>
+    </section>
 
     <div class="editor" id="editor" hidden>
       <div class="filebar">
-        <div><b id="name"></b><span class="hint" id="saved">Saved in this browser</span></div>
+        <div><b id="name"></b><span class="hint own" id="saved">Saved in this browser</span></div>
         <div class="actions">
+          <button type="button" class="btn small shots-open own">Screenshots</button>
           <button type="button" class="btn small" id="download">Download</button>
-          <label class="btn small">Open<input type="file" class="pick" accept=".json,application/json" hidden></label>
-          <button type="button" class="btn small quiet" id="close">Close</button>
+          <label class="btn small own">Open<input type="file" class="pick" accept=".json,application/json" hidden></label>
+          <button type="button" class="btn small quiet own" id="close">Close</button>
         </div>
       </div>
+
+      <section class="card scanned" id="scanned" aria-labelledby="scanned-h" hidden>
+        <div class="head"><h2 id="scanned-h">What the screenshots showed</h2>
+          <button type="button" class="x" id="scanned-close" aria-label="Dismiss" title="Dismiss">×</button></div>
+        <div id="scanned-lines"></div>
+        <p class="help">Text recognition makes mistakes: check the counts below against the game.</p>
+      </section>
 
       <section class="card needs" id="needs" aria-labelledby="needs-h" hidden>
         <h2 id="needs-h">The plan needs a few numbers</h2>
@@ -144,10 +191,11 @@
     </div>
 
     <footer class="foot">
-      <p>Your inventory stays in this browser. The page downloads Python from jsDelivr, fonts from Google
-        Fonts and Pokémon pictures from PokeAPI; none of them receive your inventory.</p>
-      <p>From <a href="https://github.com/kaustubhagarwal18/pogo-evo-planner">pogo-evo-planner</a>, which also
-        reads your screenshots into an inventory. Not affiliated with Niantic, Scopely, Nintendo or The Pokémon
+      <p>Your screenshots and inventory stay in this browser. The page downloads Python and the text reader from
+        jsDelivr, fonts from Google Fonts and Pokémon pictures from PokeAPI; none of them receive your screenshots
+        or inventory.</p>
+      <p>From <a href="https://github.com/kaustubhagarwal18/pogo-evo-planner">pogo-evo-planner</a>, whose command
+        line also reads screen recordings. Not affiliated with Niantic, Scopely, Nintendo or The Pokémon
         Company. Pokémon © Nintendo, Creatures, GAME FREAK and The Pokémon Company.</p>
     </footer>
   </section>

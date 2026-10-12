@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import time
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,7 +15,7 @@ from ..inventory import inventory_from_dict
 from ..planner import families_missing_candy
 from . import LLM_READERS
 from .frames import extract_frames
-from .ocr import read_words
+from .ocr import Word, read_words
 from .screens import ScreenResult, SpeciesMatcher, parse
 
 VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".3gp", ".avi"}
@@ -150,12 +150,15 @@ def merge(results: list[ScreenResult], report: ScanReport, times: list[float] | 
 
 
 def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps: float = 3.0,
-         progress=None, max_llm_frames: int = 60, llm_model: str | None = None) -> tuple[dict, ScanReport]:
+         progress=None, max_llm_frames: int = 60, llm_model: str | None = None,
+         read_text: Callable[[str, np.ndarray], list[Word]] | None = None) -> tuple[dict, ScanReport]:
     """OCR every screenshot and recording frame, parse each screen, and merge them into an inventory and report.
 
     backend "llm" (= "ollama", local and free) or "claude" reads the screens with a vision LLM instead of
     OCR (see scan/llm.py).
     Claude is paid per frame, so more than max_llm_frames frames is refused rather than sent.
+    read_text(label, image) gives a frame's words in place of OCR: the browser app passes the words
+    tesseract.js read.
     """
     matcher = SpeciesMatcher(species)
     report = ScanReport()
@@ -167,9 +170,10 @@ def scan(paths: Sequence[str | Path], species: dict, backend: str = "auto", fps:
         from . import llm  # needs the `llm` extras
         results = llm.read_screens(frames, matcher, species, llm.make_model(backend, llm_model), progress=progress)
     else:
+        read = read_text or (lambda _label, img: read_words(img, backend=backend))
         results = []
         for i, (label, img) in enumerate(frames):
-            res = parse(read_words(img, backend=backend), img, matcher, species)
+            res = parse(read(label, img), img, matcher, species)
             results.append(res)
             if progress:
                 progress(i + 1, len(frames), label, res.kind)

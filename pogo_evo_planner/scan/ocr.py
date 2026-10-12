@@ -7,6 +7,9 @@ Backends, in order of preference for `backend="auto"`:
   tesseract  - the Tesseract command line. Weaker on stylised text, but no
                Python dependencies; used as the fallback and in CI.
 
+The browser app reads screens with tesseract.js instead: it reads the same passes
+(tesseract_passes) with the same model, and its TSV goes through words_from_tsv.
+
 RapidOCR returns whole text lines, while the screen parsers work on words, so
 lines are split into words with x positions estimated from character offsets.
 """
@@ -54,17 +57,16 @@ def tesseract_available() -> bool:
     return shutil.which("tesseract") is not None
 
 
-def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
-    """One Tesseract pass over an image, with boxes scaled back to original pixels."""
-    with tempfile.NamedTemporaryFile(suffix=".png") as f:
-        cv2.imwrite(f.name, img)
-        out = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
-            ["tesseract", f.name, "stdout", "--psm", str(psm), "-l", "eng", "tsv"],
-            capture_output=True, text=True, check=True,
-            env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
-        ).stdout
+_TSV_HEADER = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+
+
+def words_from_tsv(tsv: str, scale: float = 1.0) -> list[Word]:
+    """Words from Tesseract's TSV output, with boxes scaled back to original pixels. The header row is optional:
+    the command line writes one, tesseract.js doesn't."""
+    if not tsv.startswith("level"):
+        tsv = _TSV_HEADER + tsv
     words = []
-    for row in csv.DictReader(io.StringIO(out), delimiter="\t", quoting=csv.QUOTE_NONE):
+    for row in csv.DictReader(io.StringIO(tsv), delimiter="\t", quoting=csv.QUOTE_NONE):
         text = (row.get("text") or "").strip()
         conf = float(row.get("conf") or -1)
         if not text or conf < 0:
@@ -74,10 +76,21 @@ def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
     return words
 
 
-def _dedupe(words: list[Word]) -> list[Word]:
-    """Merge passes: the same text at roughly the same place counts once."""
+def tesseract_passes(img: np.ndarray) -> list[tuple[np.ndarray, float]]:
+    """The images Tesseract reads for one screen, each with the scale it was resized by. Sparse-text mode silently
+    drops lines now and then, and which ones it drops depends on scale and polarity, so it reads three."""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # phone screenshots are ~1080 px wide; an upscaled pass helps small UI text
+    scale = max(1.0, 1600 / gray.shape[1])
+    big = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    # game text is both light-on-dark and dark-on-light, so read both polarities
+    return [(gray, 1.0), (255 - gray, 1.0), (big, scale)]
+
+
+def merge_passes(passes: list[list[Word]]) -> list[Word]:
+    """The words of several passes over one screen: the same text at roughly the same place counts once."""
     kept: list[Word] = []
-    for w in sorted(words, key=lambda w: -w.conf):
+    for w in sorted((w for words in passes for w in words), key=lambda w: -w.conf):
         if any(k.text.upper() == w.text.upper() and abs(k.cx - w.cx) < max(k.w, 8) and abs(k.cy - w.cy) < max(k.h, 8)
                for k in kept):
             continue
@@ -85,18 +98,24 @@ def _dedupe(words: list[Word]) -> list[Word]:
     return kept
 
 
+def _run_tesseract(img: np.ndarray, scale: float, psm: int) -> list[Word]:
+    """One Tesseract pass over an image, with boxes scaled back to original pixels."""
+    with tempfile.NamedTemporaryFile(suffix=".png") as f:
+        cv2.imwrite(f.name, img)
+        out = subprocess.run(  # fixed argv, no shell, tesseract from PATH  # nosec B603 B607
+            ["tesseract", f.name, "stdout", "--psm", str(psm), "-l", "eng", "tsv"],
+            capture_output=True, text=True, check=True,
+            env={**os.environ, "OMP_THREAD_LIMIT": "1"},  # tesseract's threading is slower on small images
+        ).stdout
+    return words_from_tsv(out, scale)
+
+
 def _tesseract_words(img: np.ndarray, psm: int = 11) -> list[Word]:
-    """Several passes merged: sparse-text mode silently drops lines now and then,
-    and which ones it drops depends on scale and polarity."""
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # phone screenshots are ~1080 px wide; an upscaled pass helps small UI text
-    scale = max(1.0, 1600 / gray.shape[1])
-    big = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    # game text is both light-on-dark and dark-on-light, so read both polarities
-    passes = [(gray, 1.0), (255 - gray, 1.0), (big, scale)]
+    """OCR an image with the Tesseract command line: every pass, merged."""
+    passes = tesseract_passes(img)
     with ThreadPoolExecutor(max_workers=len(passes)) as ex:
         results = ex.map(lambda p: _run_tesseract(p[0], p[1], psm), passes)
-    return _dedupe([w for ws in results for w in ws])
+    return merge_passes(list(results))
 
 
 # ---------------- rapidocr ----------------

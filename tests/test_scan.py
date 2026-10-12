@@ -4,13 +4,21 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import cv2
 import numpy as np
 
 from pogo_evo_planner.gamemaster import load_species
 from pogo_evo_planner.scan.frames import extract_frames
-from pogo_evo_planner.scan.ocr import Word, _split_line, available_backend
+from pogo_evo_planner.scan.ocr import (
+    Word,
+    _split_line,
+    available_backend,
+    merge_passes,
+    tesseract_passes,
+    words_from_tsv,
+)
 from pogo_evo_planner.scan.pipeline import ScanReport, merge, scan, taken_at
 from pogo_evo_planner.scan.screens import (
     ScreenResult,
@@ -262,6 +270,50 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(inv["candy"], {"DRATINI": 60})
         self.assertEqual(sorted(p["species"] for p in inv["pokemon"]), ["DRATINI", "EEVEE", "EEVEE"])
         self.assertTrue(any("conflicting DRATINI" in x for x in rep.warnings))
+
+    def test_tsv_from_the_command_line_or_tesseract_js(self):
+        """Tesseract's TSV is read with the command line's header row or without it, as tesseract.js writes it, with
+        boxes scaled back to the screenshot and empty or unconfident rows left out."""
+        rows = ("5\t1\t1\t1\t1\t1\t300\t150\t60\t30\t91.5\tRare\n"
+                "5\t1\t1\t1\t1\t2\t390\t150\t90\t30\t88\tCandy\n"
+                "4\t1\t1\t1\t1\t0\t300\t150\t180\t30\t-1\t\n"
+                "5\t1\t1\t1\t1\t3\t600\t150\t60\t30\t-1\tx\n")
+        header = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+        self.assertEqual(words_from_tsv(rows, 1.5), words_from_tsv(header + rows, 1.5))
+        self.assertEqual(words_from_tsv(rows, 1.5),
+                         [Word("Rare", 200, 100, 40, 20, 0.915), Word("Candy", 260, 100, 60, 20, 0.88)])
+
+    def test_passes_grey_negative_and_upscaled(self):
+        """Tesseract reads a screen in grey, as a negative, and upscaled to 1600 px wide when it's narrower."""
+        img = np.zeros((2400, 1080, 3), np.uint8)
+        img[100:200, 100:300] = (40, 200, 90)
+        (grey, s1), (negative, s2), (big, s3) = tesseract_passes(img)
+        self.assertEqual((s1, s2, s3), (1.0, 1.0, 1600 / 1080))
+        self.assertTrue((negative == 255 - grey).all())
+        self.assertEqual(big.shape, (round(2400 * 1600 / 1080), 1600))
+        self.assertEqual(tesseract_passes(np.zeros((3000, 2000, 3), np.uint8))[2][1], 1.0)
+
+    def test_merge_passes_counts_a_word_once(self):
+        """The same word read in several passes counts once, keeping the most confident reading."""
+        a, b = Word("CANDY", 100, 100, 80, 30, 0.6), Word("candy", 103, 101, 80, 30, 0.9)
+        self.assertEqual(merge_passes([[a], [b, w("60", 100, 50)]]), [b, w("60", 100, 50)])
+
+    def test_scan_takes_words_read_elsewhere(self):
+        """scan() parses words it's given (the browser's tesseract.js) instead of running OCR itself."""
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "bag.png"
+            cv2.imwrite(str(path), mockscreens.bag_screen())
+            given = []
+
+            def read_text(label, img):
+                """The words of a bag screen, noting which frame was asked for."""
+                given.append((label, img.shape))
+                return [w("Rare", 300, 900), w("Candy", 420, 900), w("x150", 860, 900)]
+
+            with mock.patch("pogo_evo_planner.scan.pipeline.read_words", side_effect=AssertionError("ran OCR")):
+                inv, report = scan([path], SPECIES, read_text=read_text)
+        self.assertEqual(given, [("bag.png", mockscreens.bag_screen().shape)])
+        self.assertEqual((inv["rare_candy"], dict(report.screens)), (150, {"bag": 1}))
 
     def test_rapidocr_line_split(self):
         """A RapidOCR text line is split into word boxes in reading order."""

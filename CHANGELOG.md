@@ -7,11 +7,17 @@ Before 1.0, a new minor version may change commands or file formats.
 
 ### Added
 
-- A browser app (`web/`), published on GitHub Pages. Open an `inventory.json` or `evolvenew.json`,
-  try the example, or type an inventory in. Then edit it and watch the plan and the dashboard
-  update. It asks for the candy counts and evolution items the plan is missing. The planner's
-  Python runs in the page through Pyodide, so the inventory never leaves the browser; the browser
-  keeps it between visits.
+- A browser app (`web/`), published on GitHub Pages. It opens with an example inventory and its
+  plan, and offers two ways to replace it: upload screenshots (the `evolvenew` way or your whole
+  collection) or upload an `inventory.json` or `evolvenew.json`. You can also type an inventory
+  in. Then edit it and watch the plan and the dashboard update. It asks for the candy
+  counts, evolution items and Rare Candy the plan is missing. Everything runs in the page: the
+  planner's and scanner's own Python through Pyodide, and tesseract.js reading the text with the
+  `--ocr tesseract` reader's model. Screenshots and the inventory never leave the browser; the
+  browser keeps the inventory between visits.
+- `scan()` takes `read_text`, words read elsewhere in place of OCR, and `ocr.py` has the pieces
+  the browser shares with the Tesseract reader: `tesseract_passes`, `words_from_tsv` (with or
+  without a header row) and `merge_passes`.
 - `make web` builds the browser app into `site/`; `make serve` also serves it locally.
 - The `pages` workflow builds the site with the latest game master and publishes it: on pushes
   to `main`, every Monday, and by hand.
@@ -29,10 +35,13 @@ Before 1.0, a new minor version may change commands or file formats.
 
 ### Known issues
 
-- The browser app doesn't read screenshots or recordings yet. Make the inventory with `scan` or
-  `evolvenew`, then open it in the page.
-- The first visit downloads about 6 MB of Python from jsDelivr; later visits use the browser's
-  cache.
+- The browser app doesn't read recordings yet, and reads screenshots with Tesseract only, not
+  RapidOCR. Use `scan` or `evolvenew` for recordings.
+- The first visit downloads about 6 MB of Python from jsDelivr, and reading screenshots the first
+  time about 17 MB more; later visits use the browser's cache. How long that takes depends on the
+  CDN: one test took 65 s, mostly a slow jsDelivr edge serving NumPy.
+- Reading new screenshots replaces the open inventory, edits included: download it first to keep
+  it.
 
 ## [0.1.1] - Unreleased
 
